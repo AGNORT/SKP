@@ -3,6 +3,11 @@
 
 using namespace std;
 
+int g_gurobi_setting = 1;          //Linearized, outer Approximation + Dual Simplex: MIQCPMethod = 1, Method = 1;
+                        //2;        //Linearized, outer Approximation + Primal Simplex: MIQCPMethod = 1, Method = 0;
+                        //3;        //Conic + Barrier: MIQCPMethod = 0, Method = 2 (that should be what we already have, but let's make MIQCPMethod explicit);
+                        //4;        //Gurobi default settings without specifying anything.
+
 //call the gurobi solver to solve the compact SOCP model of submodular knapsack problem
 void SolveCompactKnapsackModel(Args& args) {
     //read instance
@@ -39,13 +44,30 @@ void SolveCompactKnapsackModel(Args& args) {
             rhs += instance.b_ptr[j] * x[j];
         model.addQConstr(t * t == rhs, "t_squared_constraint");
 
-        // set precision
-        model.set(GRB_DoubleParam_MIPGap, 1e-6);           
-        model.set(GRB_DoubleParam_FeasibilityTol, 1e-9);   
-        model.set(GRB_DoubleParam_OptimalityTol, 1e-9);    
-        model.set(GRB_DoubleParam_IntFeasTol, 1e-9);       
-        model.set(GRB_IntParam_Presolve, 2);               
-        model.set(GRB_IntParam_Method, 2);                 
+        // Set the model parameters
+        model.set(GRB_DoubleParam_MIPGap, 1e-6);
+        model.set(GRB_DoubleParam_FeasibilityTol, 1e-9);
+        model.set(GRB_DoubleParam_OptimalityTol, 1e-9);
+        model.set(GRB_DoubleParam_IntFeasTol, 1e-9);
+        if (g_gurobi_setting == 1) {
+            model.set(GRB_IntParam_MIQCPMethod, 1);
+            model.set(GRB_IntParam_Method, 1);
+        }
+        else if (g_gurobi_setting == 2) {
+            model.set(GRB_IntParam_MIQCPMethod, 1);
+            model.set(GRB_IntParam_Method, 0);
+        }
+        else if (g_gurobi_setting == 3) {
+            model.set(GRB_IntParam_MIQCPMethod, 0);
+            model.set(GRB_IntParam_Method, 2);
+        }
+        else if (g_gurobi_setting == 4) {
+            //Leave it default
+        }
+        else {
+            cerr << "Gurobi setting not specified! Pease the global variable 'g_gurobi_setting'" << endl;
+            exit(-1);
+        }
 
         model.set(GRB_DoubleParam_TimeLimit, 7200.0);        //set maximum solution time
 

@@ -13,7 +13,6 @@ int secondDim = 0;								//the second dimension of the bucket
 double g_bestLB = 0;								//the best lower bound		
 int g_secondDimDiv = 1;							//the divisor for second dimension of the bucket
 double g_smallest_bDiva = 1e10;					//the smallest ratio of a/b for the present instance	
-bool g_solveKnapsack = false;					//if solve the knapsack problem
 
 vector<double> g_profitRec;						//the profit record from each item
 
@@ -28,7 +27,7 @@ bool g_aInteger = true;						//remark if parameter a is integer
 int g_tolGeneratedLabel = 0;					//the total number of generated labels
 int g_nonDominatedLabel = 0;					//the total number of non-dominated labels
 int g_CBFathomLabel = 0;						//the number of labels fathomed by CB
-int g_dominatedLabel = 0;						//the number of labels fathomed by CB
+int g_dominatedLabel = 0;						//the number of labels fathomed by dominance rules
 
 /*sort the instances according to the sum of a and b*/
 // ascending sort
@@ -617,7 +616,7 @@ void LabelSettingHeuristic(
 			}
 			thisNonDominatedLabel += (*newExtended)[sndBktIdx].size();
 			//use the present best dual variable to update
-			if (!g_solveKnapsack && !(*newExtended)[sndBktIdx].empty()) {
+			if (!(*newExtended)[sndBktIdx].empty()) {
 				if ((*newExtended)[sndBktIdx].begin()->first > g_bestLB) {
 					KnapsackSol preSol;
 					preSol.bestLab = new MyLabel((*newExtended)[sndBktIdx].begin()->second);

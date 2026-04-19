@@ -44,7 +44,6 @@ extern int secondDim;								//the second dimension of the bucket
 extern double g_bestLB;								//the best lower bound		
 extern int g_secondDimDiv;							//the divisor for second dimension of the bucket
 extern double g_smallest_bDiva;						//the smallest ratio of a/b for the present instance	
-extern bool g_solveKnapsack;						//if solve the knapsack problem
 
 extern Instance g_instance;							//g_instance data				
 
