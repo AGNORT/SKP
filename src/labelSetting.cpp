@@ -29,6 +29,21 @@ int g_nonDominatedLabel = 0;					//the total number of non-dominated labels
 int g_CBFathomLabel = 0;						//the number of labels fathomed by CB
 int g_dominatedLabel = 0;						//the number of labels fathomed by dominance rules
 
+/*Components included in the algorithm*/
+bool g_use_strong_dom_rules = true;				//if the strong dominance rules are used
+bool g_use_CB = true;							//if the completion bound is used
+bool g_use_TS = true;							//if the TS is used
+bool g_use_HLA = true;							//if the HLA is used
+bool g_labeling_stgy = 1;						//default setting one, strong dom + CB + TS + HLA
+						//2;					//setting two: strong dom without {CB + TS + HLA}
+						//3;					//setting three: strong dom + CB + TS
+						//4;					//setting four: strong dom + CB + HLA
+						//5;					//setting five: normal dom + CB + TS + HLA
+						//6;					//setting six: normal dom without {CB + TS + HLA}
+						//7;					//setting seven: normal dom + CB + TS
+						//8;					//setting eight: normal dom + CB + HLA
+
+
 /*sort the instances according to the sum of a and b*/
 // ascending sort
 int compare_item_index_ab(const void* a, const void* b) {
@@ -210,8 +225,14 @@ bool JgeLabDominance(MyLabel* lab1, MyLabel* lab2, bool heuDom) {
 		else {
 			if ((int)lab1->tolProfit < (int)lab2->tolProfit) return false;
 		}
-		//if (lab1->sum_b > lab2->sum_b + EX) return false; //old weaker version
-		if (lab1->tolWeight > lab2->tolWeight + EX) return false;
+		if (!g_use_strong_dom_rules) {
+			if (lab1->sum_b > lab2->sum_b + EX) 
+				return false; //old weaker version
+		}
+		else {
+			if (lab1->tolWeight > lab2->tolWeight + EX) 
+				return false; //new strong version
+		}
 		if (!g_aInteger) {
 			if (lab1->sum_a > lab2->sum_a + EX) return false;
 		}
@@ -269,6 +290,8 @@ int CompletionBound(
 	int prefirstIdx,
 	DblMatrix* ub_matr
 ) {
+	if (!g_use_CB)
+		return false;
 	//strengthened completion bound
 	size_t i = ub_matr->cols - prefirstIdx - 1;
 	int secondIdx = g_weight_to_secondIdx[(size_t)ceil(lab->tolWeight)];
@@ -753,6 +776,43 @@ int LabelSettingSolveKnapsack(Args& args) {
 			g_smallest_bDiva = preRatio;
 	}
 
+	//specify the component used in the labeling
+	if (g_labeling_stgy == 1) {
+		//keep the default setting.
+	}
+	else if (g_labeling_stgy == 2) {
+		bool g_use_CB = false;							
+		bool g_use_TS = false;							
+		bool g_use_HLA = false;							
+	}
+	else if (g_labeling_stgy == 3) {
+		bool g_use_HLA = false;
+	}
+	else if (g_labeling_stgy == 4) {
+		bool g_use_TS = false;
+	}
+	else if (g_labeling_stgy == 5) {
+		g_use_strong_dom_rules = false;
+	}
+	else if (g_labeling_stgy == 6) {
+		g_use_strong_dom_rules = false;
+		bool g_use_CB = false;
+		bool g_use_TS = false;
+		bool g_use_HLA = false;
+	}
+	else if (g_labeling_stgy == 7) {
+		g_use_strong_dom_rules = false;
+		bool g_use_HLA = false;
+	}
+	else if (g_labeling_stgy == 8) {
+		g_use_strong_dom_rules = false;
+		bool g_use_TS = false;
+	}
+	else  {
+		cerr << "Error when specify the labeling components to use!" << endl;
+		exit(-1);
+	}
+
 	//specify the dimension of the bucket
 	g_tolItemNum = g_instance.n_items;			//the first dimension of the bucket
 	g_firstDim = g_instance.n_items / 1;		//the first dimension of the bucket
@@ -768,26 +828,29 @@ int LabelSettingSolveKnapsack(Args& args) {
 	ItemIndex* indicesRec = nullptr;
 	sort_instance_by_p_ab(g_instance, indicesRec);
 	//TS heuristic
-	vector<int> ts_sol_items(g_tolItemNum);
-	double ts_sol = heuristic_solution(&g_instance, &ts_sol_items[0]);
-	g_bestLB = max(g_bestLB, ts_sol);
-	double tsSol_sum_a = 0;
-	double tsSol_sum_b = 0;
-	vector<int> map_ts_sol_items(g_tolItemNum);
-	for (int i = 0; i < g_tolItemNum; ++i) {
-		if (ts_sol_items[i]) {
-			tsSol_sum_a += g_instance.a_ptr[i];
-			tsSol_sum_b += g_instance.b_ptr[i];
-			map_ts_sol_items[indicesRec[i].index] = 1;
+	double ts_sol = 0;
+	if (g_use_TS) {
+		vector<int> ts_sol_items(g_tolItemNum);
+		ts_sol = heuristic_solution(&g_instance, &ts_sol_items[0]);
+		g_bestLB = max(g_bestLB, ts_sol);
+		double tsSol_sum_a = 0;
+		double tsSol_sum_b = 0;
+		vector<int> map_ts_sol_items(g_tolItemNum);
+		for (int i = 0; i < g_tolItemNum; ++i) {
+			if (ts_sol_items[i]) {
+				tsSol_sum_a += g_instance.a_ptr[i];
+				tsSol_sum_b += g_instance.b_ptr[i];
+				map_ts_sol_items[indicesRec[i].index] = 1;
+			}
 		}
+		MyLabel* tsSolLab = new MyLabel();
+		tsSolLab->tolProfit = ts_sol;
+		tsSolLab->itemSet = map_ts_sol_items;
+		tsSolLab->tolWeight = tsSol_sum_a + g_instance.rho * sqrt(tsSol_sum_b);
+		KnapsackSol preSol;
+		preSol.bestLab = tsSolLab;
+		finalSols.insert({ ts_sol, preSol });
 	}
-	MyLabel* tsSolLab = new MyLabel();
-	tsSolLab->tolProfit = ts_sol;
-	tsSolLab->itemSet = map_ts_sol_items;
-	tsSolLab->tolWeight = tsSol_sum_a + g_instance.rho * sqrt(tsSol_sum_b);
-	KnapsackSol preSol;
-	preSol.bestLab = tsSolLab;
-	finalSols.insert({ ts_sol, preSol });
 	auto heuPrimal_endTime = chrono::high_resolution_clock::now();
 
 	/*construct bucket index*/
@@ -826,18 +889,19 @@ int LabelSettingSolveKnapsack(Args& args) {
 
 	/*use the heuristic labeling algorithm to get better lower bound*/
 	double heuLableTime = 0;
-	unordered_map<int, ItemIndex> removedIndicesRec;
-	vector<double> sr3Duals;
-	vector<unordered_set<int>> sr3s;
-	vector<double> preciseDuals(g_instance.n_items, 0);
-	for (int i = 0; i < g_instance.n_items; ++i)
-		preciseDuals[i] = g_instance.p_ptr[i];
-
 	double dualBoundTime = 0; bool solvedFlag = true;
+	if (g_use_HLA) {
+		unordered_map<int, ItemIndex> removedIndicesRec;
+		vector<double> sr3Duals;
+		vector<unordered_set<int>> sr3s;
+		vector<double> preciseDuals(g_instance.n_items, 0);
+		for (int i = 0; i < g_instance.n_items; ++i)
+			preciseDuals[i] = g_instance.p_ptr[i];
 
-	LabelSettingHeuristic(ub_matr, heuLableTime, indicesRec, sr3Duals, sr3s, removedIndicesRec, finalSols);//mask HLA
-	cout << "heuristic labeling get lower bound: " << g_bestLB << endl;
-	cout << "heuristic labeling use time: " << heuLableTime << "s" << endl;
+		LabelSettingHeuristic(ub_matr, heuLableTime, indicesRec, sr3Duals, sr3s, removedIndicesRec, finalSols);//mask HLA
+		cout << "heuristic labeling get lower bound: " << g_bestLB << endl;
+		cout << "heuristic labeling use time: " << heuLableTime << "s" << endl;
+	}
 	int HLA_sol = g_bestLB;
 	
 	auto exactDP_startTime = chrono::high_resolution_clock::now();
