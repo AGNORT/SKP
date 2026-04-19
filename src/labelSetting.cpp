@@ -387,7 +387,8 @@ void JgeDominance(
 						else {
 							delete ite->second;
 							ite->second = nullptr;
-							++g_dominatedLabel;
+							if(!heuDom)
+								++g_dominatedLabel;
 						}
 					}
 					ite = newExtended[j].erase(ite);
@@ -405,7 +406,8 @@ void JgeDominance(
 							else {
 								delete ite->second;
 								ite->second = nullptr;
-								++g_dominatedLabel;
+								if (!heuDom)
+									++g_dominatedLabel;
 							}
 						}
 						ite = newExtended[j].erase(ite);
@@ -585,7 +587,7 @@ void LabelSettingHeuristic(
 
 					//completion bound to fathom label
 					if (CompletionBound(tmpLab, currItem + 1, &ub_matr)) {
-						++g_CBFathomLabel;
+						//++g_CBFathomLabel;
 						delete tmpLab; tmpLab = nullptr;
 						//before insert the old label, do the dominance check
 						MyLabel* oldLab = ite->second;
@@ -610,7 +612,7 @@ void LabelSettingHeuristic(
 					if (dominanceFlag) {
 						delete tmpLab;
 						tmpLab = nullptr;
-						++g_dominatedLabel;
+						//++g_dominatedLabel;
 					}
 					else {
 						//dominate other labels
@@ -715,7 +717,7 @@ void LabelSettingHeuristic(
 	}
 	delete oldExtended;
 	delete newExtended;
-	g_dominatedLabel += dominatedOldLabs.size();
+	//g_dominatedLabel += dominatedOldLabs.size();
 	for (auto& t : dominatedOldLabs)
 		delete t;
 	g_nonDominatedLabel = thisNonDominatedLabel;
