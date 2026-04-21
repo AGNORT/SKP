@@ -34,7 +34,7 @@ bool g_use_strong_dom_rules = true;				//if the strong dominance rules are used
 bool g_use_CB = true;							//if the completion bound is used
 bool g_use_TS = true;							//if the TS is used
 bool g_use_HLA = true;							//if the HLA is used
-bool g_labeling_stgy = 1;						//default setting one, strong dom + CB + TS + HLA
+int g_labeling_stgy = 1;						//default setting one, strong dom + CB + TS + HLA
 						//2;					//setting two: strong dom without {CB + TS + HLA}
 						//3;					//setting three: strong dom + CB + TS
 						//4;					//setting four: strong dom + CB + HLA
@@ -783,32 +783,32 @@ int LabelSettingSolveKnapsack(Args& args) {
 		//keep the default setting.
 	}
 	else if (g_labeling_stgy == 2) {
-		bool g_use_CB = false;							
-		bool g_use_TS = false;							
-		bool g_use_HLA = false;							
+		g_use_CB = false;							
+		g_use_TS = false;							
+		g_use_HLA = false;							
 	}
 	else if (g_labeling_stgy == 3) {
-		bool g_use_HLA = false;
+		g_use_HLA = false;
 	}
 	else if (g_labeling_stgy == 4) {
-		bool g_use_TS = false;
+		g_use_TS = false;
 	}
 	else if (g_labeling_stgy == 5) {
 		g_use_strong_dom_rules = false;
 	}
 	else if (g_labeling_stgy == 6) {
 		g_use_strong_dom_rules = false;
-		bool g_use_CB = false;
-		bool g_use_TS = false;
-		bool g_use_HLA = false;
+		g_use_CB = false;
+		g_use_TS = false;
+		g_use_HLA = false;
 	}
 	else if (g_labeling_stgy == 7) {
 		g_use_strong_dom_rules = false;
-		bool g_use_HLA = false;
+		g_use_HLA = false;
 	}
 	else if (g_labeling_stgy == 8) {
 		g_use_strong_dom_rules = false;
-		bool g_use_TS = false;
+		g_use_TS = false;
 	}
 	else  {
 		cerr << "Error when specify the labeling components to use!" << endl;
