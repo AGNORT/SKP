@@ -240,35 +240,59 @@ bool JgeLabDominance(MyLabel* lab1, MyLabel* lab2, bool heuDom) {
 			if ((int)lab1->sum_a > (int)lab2->sum_a) return false;
 		}
 
-
-		if (g_pInteger && !g_aInteger) {
-			if (
-				(int)lab1->tolProfit > (int)lab2->tolProfit ||
-				//lab1->sum_b < lab2->sum_b - EX || //old weaker version
-				lab1->tolWeight < lab2->tolWeight - EX ||
-				lab1->sum_a < lab2->sum_a - EX) return true;
+		if (!g_use_strong_dom_rules) {
+			if (g_pInteger && !g_aInteger) {
+				if (
+					(int)lab1->tolProfit > (int)lab2->tolProfit ||
+					lab1->sum_b < lab2->sum_b - EX || //old weaker version
+					lab1->sum_a < lab2->sum_a - EX) return true;
+			}
+			else if (!g_pInteger && g_aInteger) {
+				if (
+					lab1->tolProfit > lab2->tolProfit + EX ||
+					lab1->sum_b < lab2->sum_b - EX || //old weaker version
+					(int)lab1->sum_a < (int)lab2->sum_a) return true;
+			}
+			else if (!g_pInteger && !g_aInteger) {
+				if (
+					lab1->tolProfit > lab2->tolProfit + EX ||
+					lab1->sum_b < lab2->sum_b - EX || //old weaker version
+					lab1->sum_a < lab2->sum_a - EX) return true;
+			}
+			else {//(g_pInteger && g_aInteger)
+				if (
+					(int)lab1->tolProfit > (int)lab2->tolProfit ||
+					lab1->sum_b < lab2->sum_b - EX || //old weaker version
+					(int)lab1->sum_a < (int)lab2->sum_a) return true;
+			}
 		}
-		else if (!g_pInteger && g_aInteger) {
-			if (
-				lab1->tolProfit > lab2->tolProfit + EX ||
-				//lab1->sum_b < lab2->sum_b - EX || //old weaker version
-				lab1->tolWeight < lab2->tolWeight - EX ||
-				(int)lab1->sum_a < (int)lab2->sum_a) return true;
+		else {
+			if (g_pInteger && !g_aInteger) {
+				if (
+					(int)lab1->tolProfit > (int)lab2->tolProfit ||
+					lab1->tolWeight < lab2->tolWeight - EX ||
+					lab1->sum_a < lab2->sum_a - EX) return true;
+			}
+			else if (!g_pInteger && g_aInteger) {
+				if (
+					lab1->tolProfit > lab2->tolProfit + EX ||
+					lab1->tolWeight < lab2->tolWeight - EX ||
+					(int)lab1->sum_a < (int)lab2->sum_a) return true;
+			}
+			else if (!g_pInteger && !g_aInteger) {
+				if (
+					lab1->tolProfit > lab2->tolProfit + EX ||
+					lab1->tolWeight < lab2->tolWeight - EX ||
+					lab1->sum_a < lab2->sum_a - EX) return true;
+			}
+			else {//(g_pInteger && g_aInteger)
+				if (
+					(int)lab1->tolProfit > (int)lab2->tolProfit ||
+					lab1->tolWeight < lab2->tolWeight - EX ||
+					(int)lab1->sum_a < (int)lab2->sum_a) return true;
+			}
 		}
-		else if (!g_pInteger && !g_aInteger) {
-			if (
-				lab1->tolProfit > lab2->tolProfit + EX ||
-				//lab1->sum_b < lab2->sum_b - EX || //old weaker version
-				lab1->tolWeight < lab2->tolWeight - EX ||
-				lab1->sum_a < lab2->sum_a - EX) return true;
-		}
-		else {//(g_pInteger && g_aInteger)
-			if (
-				(int)lab1->tolProfit > (int)lab2->tolProfit ||
-				//lab1->sum_b < lab2->sum_b - EX || //old weaker version
-				lab1->tolWeight < lab2->tolWeight - EX ||
-				(int)lab1->sum_a < (int)lab2->sum_a) return true;
-		}
+		
 
 		return false;
 	}
