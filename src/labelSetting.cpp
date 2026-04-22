@@ -34,9 +34,9 @@ bool g_use_strong_dom_rules = true;				//if the strong dominance rules are used
 bool g_use_CB = true;							//if the completion bound is used
 bool g_use_TS = true;							//if the TS is used
 bool g_use_HLA = true;							//if the HLA is used
-int g_labeling_stgy = 1;						//default setting one, strong dom + CB + TS + HLA
-						//2;					//setting two: strong dom without {CB + TS + HLA}
-						//3;					//setting three: strong dom + CB + TS
+int g_labeling_stgy = //1;						//default setting one, strong dom + CB + TS + HLA
+//2;					//setting two: strong dom without {CB + TS + HLA}
+						3;					//setting three: strong dom + CB + TS
 						//4;					//setting four: strong dom + CB + HLA
 						//5;					//setting five: normal dom + CB + TS + HLA
 						//6;					//setting six: normal dom without {CB + TS + HLA}
@@ -304,56 +304,6 @@ int CompletionBound(
 		}
 	}
 	return false;
-}
-
-//label dominance
-void JgeDominance(
-	vector<vector<multimap<double, MyLabel*, greater<double>>>>& nonExtended,
-	//vector<vector<multimap<double, MyLabel*, greater<double>>>>& extended,
-	set<int>& firstNonBucketIdx,
-	vector<set<int>>& secondNonBucketIdx,
-	MyLabel* lab,
-	int& labelCnt) {
-	//find the dimension of the bucket
-	int firstIdx = g_item_to_firstIdx[lab->lastItem];
-	int secondIdx = g_weight_to_secondIdx[(size_t)ceil(lab->tolWeight)];
-
-	////judge dominance
-	bool dominanceFlag = false;
-	auto idxIte1 = firstNonBucketIdx.begin();
-
-	if (!dominanceFlag) {
-		//use the present label to dominate other labels in the bucket
-		idxIte1 = firstNonBucketIdx.find(firstIdx);
-		while (idxIte1 != firstNonBucketIdx.end()) {
-			int i = *idxIte1;
-			auto idxIte2 = secondNonBucketIdx[i].find(secondIdx);
-			auto tIte = idxIte2;
-			while (idxIte2 != secondNonBucketIdx[i].end()) {
-				int j = *idxIte2;
-				if (!nonExtended[i][j].empty() &&
-					lab->tolProfit < (--nonExtended[i][j].end())->first) {
-					++idxIte2;
-					continue;
-				}
-
-				auto domIite = nonExtended[i][j].begin();
-				while (domIite != nonExtended[i][j].end()) {
-					if (JgeLabDominance(lab, domIite->second, true)) {
-						delete domIite->second;
-						domIite = nonExtended[i][j].erase(domIite);
-						--labelCnt;
-						//cout << "nonExtended dominanted" << endl;
-						continue;
-					}
-					++domIite;
-				}
-				
-				++idxIte2;
-			}
-			++idxIte1;
-		}
-	}
 }
 
 //label dominance
@@ -892,14 +842,13 @@ int LabelSettingSolveKnapsack(Args& args) {
 	/*use the heuristic labeling algorithm to get better lower bound*/
 	double heuLableTime = 0;
 	double dualBoundTime = 0; bool solvedFlag = true;
+	unordered_map<int, ItemIndex> removedIndicesRec;
+	vector<double> sr3Duals;
+	vector<unordered_set<int>> sr3s;
+	vector<double> preciseDuals(g_instance.n_items, 0);
+	for (int i = 0; i < g_instance.n_items; ++i)
+		preciseDuals[i] = g_instance.p_ptr[i];
 	if (g_use_HLA) {
-		unordered_map<int, ItemIndex> removedIndicesRec;
-		vector<double> sr3Duals;
-		vector<unordered_set<int>> sr3s;
-		vector<double> preciseDuals(g_instance.n_items, 0);
-		for (int i = 0; i < g_instance.n_items; ++i)
-			preciseDuals[i] = g_instance.p_ptr[i];
-
 		LabelSettingHeuristic(ub_matr, heuLableTime, indicesRec, sr3Duals, sr3s, removedIndicesRec, finalSols);//mask HLA
 		cout << "heuristic labeling get lower bound: " << g_bestLB << endl;
 		cout << "heuristic labeling use time: " << heuLableTime << "s" << endl;
@@ -1000,6 +949,23 @@ int LabelSettingSolveKnapsack(Args& args) {
 				}
 			}
 			thisNonDominatedLabel += (*newExtended)[sndBktIdx].size();
+			//use the present best dual variable to update
+			if (!(*newExtended)[sndBktIdx].empty()) {
+				if ((*newExtended)[sndBktIdx].begin()->first > g_bestLB) {
+					KnapsackSol preSol;
+					preSol.bestLab = new MyLabel((*newExtended)[sndBktIdx].begin()->second);
+					//get the item set
+					if (preSol.bestLab->itemSet.empty())
+						preSol.bestLab->itemSet.resize(g_instance.n_items + removedIndicesRec.size());
+					auto tmpLab = preSol.bestLab;
+					while (tmpLab->parentLab != nullptr) {
+						preSol.bestLab->itemSet[indicesRec[tmpLab->lastItem].index] = 1;
+						tmpLab = tmpLab->parentLab;
+					}
+					finalSols.insert({ (*newExtended)[sndBktIdx].begin()->first, preSol });
+					g_bestLB = max(g_bestLB, (*newExtended)[sndBktIdx].begin()->first);
+				}
+			}
 		}
 		auto endTime = chrono::high_resolution_clock::now();
 		if (chrono::duration_cast<chrono::milliseconds>(endTime - startTime).count() / 1000.0 >= MAXMUMSOLTIME) {
