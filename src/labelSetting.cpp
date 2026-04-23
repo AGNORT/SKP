@@ -36,8 +36,8 @@ bool g_use_TS = true;							//if the TS is used
 bool g_use_HLA = true;							//if the HLA is used
 int g_labeling_stgy = 1;						//default setting one, strong dom + CB + TS + HLA
 //2;					//setting two: strong dom without {CB + TS + HLA}
-						//3;					//setting three: strong dom + CB + TS
-						//4;					//setting four: strong dom + CB + HLA
+//3;					//setting three: strong dom + CB + TS
+//4;					//setting four: strong dom + CB + HLA
 						//5;					//setting five: normal dom + CB + TS + HLA
 						//6;					//setting six: normal dom without {CB + TS + HLA}
 						//7;					//setting seven: normal dom + CB + TS
@@ -851,10 +851,10 @@ int LabelSettingSolveKnapsack(Args& args) {
 			g_weight_to_secondIdx[w] = j;
 	}
 
+	auto LR_startTime = chrono::high_resolution_clock::now();
+	/*compute linear upper bound (dual bound)*/
+	DblMatrix ub_matr = { 0 };
 	if(g_use_CB){
-		/*compute linear upper bound (dual bound)*/
-		auto LR_startTime = chrono::high_resolution_clock::now();
-		DblMatrix ub_matr = { 0 };
 		dm_new(&ub_matr, g_instance.n_items + 1, secondDim + 1);
 		for (size_t i = 0; i <= g_instance.n_items; ++i) {
 			for (size_t j = 0; j <= secondDim; ++j) {
@@ -862,8 +862,8 @@ int LabelSettingSolveKnapsack(Args& args) {
 			}
 		}
 		FKP(&g_instance, &ub_matr, weightRec, false);//mask completion bound
-		auto LR_endTime = chrono::high_resolution_clock::now();
 	}
+	auto LR_endTime = chrono::high_resolution_clock::now();
 
 	/*use the heuristic labeling algorithm to get better lower bound*/
 	double heuLableTime = 0;
