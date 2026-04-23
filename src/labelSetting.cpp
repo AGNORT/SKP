@@ -34,9 +34,9 @@ bool g_use_strong_dom_rules = true;				//if the strong dominance rules are used
 bool g_use_CB = true;							//if the completion bound is used
 bool g_use_TS = true;							//if the TS is used
 bool g_use_HLA = true;							//if the HLA is used
-int g_labeling_stgy = //1;						//default setting one, strong dom + CB + TS + HLA
+int g_labeling_stgy = 1;						//default setting one, strong dom + CB + TS + HLA
 //2;					//setting two: strong dom without {CB + TS + HLA}
-						3;					//setting three: strong dom + CB + TS
+						//3;					//setting three: strong dom + CB + TS
 						//4;					//setting four: strong dom + CB + HLA
 						//5;					//setting five: normal dom + CB + TS + HLA
 						//6;					//setting six: normal dom without {CB + TS + HLA}
@@ -530,7 +530,7 @@ void LabelSettingHeuristic(
 
 	MyLabel* initLab = new MyLabel();
 	oldExtended->begin()->insert({ 0, initLab });
-	++g_tolGeneratedLabel;
+	// ++g_tolGeneratedLabel;
 
 	//label extention and dominance
 	int currItem = 0;				//record the current item to extend
@@ -548,7 +548,7 @@ void LabelSettingHeuristic(
 					keepOld = false;
 				}
 				else {
-					++g_tolGeneratedLabel;
+					// ++g_tolGeneratedLabel;
 				}
 
 				double preWeight = ite->second->sum_a + g_instance.a_ptr[currItem] +
@@ -557,7 +557,7 @@ void LabelSettingHeuristic(
 					//label extension
 					MyLabel* tmpLab = new MyLabel(ite->second);
 					LabelExtention(g_instance, ite->second, tmpLab, currItem);
-					++g_tolGeneratedLabel;
+					// ++g_tolGeneratedLabel;
 
 					//completion bound to fathom label
 					if (CompletionBound(tmpLab, currItem + 1, &ub_matr)) {
@@ -694,7 +694,7 @@ void LabelSettingHeuristic(
 	//g_dominatedLabel += dominatedOldLabs.size();
 	for (auto& t : dominatedOldLabs)
 		delete t;
-	g_nonDominatedLabel = thisNonDominatedLabel;
+	// g_nonDominatedLabel = thisNonDominatedLabel;
 	//cout << "The trend of non dominated labels in heuristic label algorithm: " << endl;
 	//outPut << "The trend of non dominated labels in heuristic label algorithm: " << endl;
 	//for (auto& e : nonDominatedLabsRec) {
@@ -794,18 +794,18 @@ int LabelSettingSolveKnapsack(Args& args) {
 	g_firstDim = g_instance.n_items / 1;		//the first dimension of the bucket
 	secondDim = g_instance.capacity / g_secondDimDiv;       //the second dimension of the bucket
 
-	/*use heuristic to get primal bound*/
-	auto heuPrimal_startTime = chrono::high_resolution_clock::now();
-	//get the initial lower bound
 	multimap<double, KnapsackSol, greater<double>> finalSols;
 	g_bestLB = 0;
-	GetInitialLowerBound(g_bestLB);
 	//sort the instance according to p/(a+sqrt(b))
 	ItemIndex* indicesRec = nullptr;
 	sort_instance_by_p_ab(g_instance, indicesRec);
+	/*use heuristic to get primal bound*/
+	auto heuPrimal_startTime = chrono::high_resolution_clock::now();
 	//TS heuristic
 	double ts_sol = 0;
 	if (g_use_TS) {
+		//get the initial lower bound
+		GetInitialLowerBound(g_bestLB);
 		vector<int> ts_sol_items(g_tolItemNum);
 		ts_sol = heuristic_solution(&g_instance, &ts_sol_items[0]);
 		g_bestLB = max(g_bestLB, ts_sol);
@@ -851,17 +851,19 @@ int LabelSettingSolveKnapsack(Args& args) {
 			g_weight_to_secondIdx[w] = j;
 	}
 
-	/*compute linear upper bound (dual bound)*/
-	auto LR_startTime = chrono::high_resolution_clock::now();
-	DblMatrix ub_matr = { 0 };
-	dm_new(&ub_matr, g_instance.n_items + 1, secondDim + 1);
-	for (size_t i = 0; i <= g_instance.n_items; ++i) {
-		for (size_t j = 0; j <= secondDim; ++j) {
-			dm_set(&ub_matr, i, j, INFINITY);
+	if(g_use_CB){
+		/*compute linear upper bound (dual bound)*/
+		auto LR_startTime = chrono::high_resolution_clock::now();
+		DblMatrix ub_matr = { 0 };
+		dm_new(&ub_matr, g_instance.n_items + 1, secondDim + 1);
+		for (size_t i = 0; i <= g_instance.n_items; ++i) {
+			for (size_t j = 0; j <= secondDim; ++j) {
+				dm_set(&ub_matr, i, j, INFINITY);
+			}
 		}
+		FKP(&g_instance, &ub_matr, weightRec, false);//mask completion bound
+		auto LR_endTime = chrono::high_resolution_clock::now();
 	}
-	FKP(&g_instance, &ub_matr, weightRec, false);//mask completion bound
-	auto LR_endTime = chrono::high_resolution_clock::now();
 
 	/*use the heuristic labeling algorithm to get better lower bound*/
 	double heuLableTime = 0;
@@ -872,12 +874,13 @@ int LabelSettingSolveKnapsack(Args& args) {
 	vector<double> preciseDuals(g_instance.n_items, 0);
 	for (int i = 0; i < g_instance.n_items; ++i)
 		preciseDuals[i] = g_instance.p_ptr[i];
+	int HLA_sol = 0;
 	if (g_use_HLA) {
 		LabelSettingHeuristic(ub_matr, heuLableTime, indicesRec, sr3Duals, sr3s, removedIndicesRec, finalSols);//mask HLA
 		cout << "heuristic labeling get lower bound: " << g_bestLB << endl;
 		cout << "heuristic labeling use time: " << heuLableTime << "s" << endl;
+		HLA_sol = g_bestLB;
 	}
-	int HLA_sol = g_bestLB;
 	
 	auto exactDP_startTime = chrono::high_resolution_clock::now();
 	//initialize the bucket
