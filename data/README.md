@@ -9,8 +9,8 @@ All instances share the same following format:
 
 - First line – Three values:
   - The number of items (*n*);
-  - The bin capacity;
-  - The confidence level.
+  - The bin capacity (*q*);
+  - The impact of the submodular weight (*$\rho$*).
 - Next *n* lines – Each line corresponds to one item and contains its three parameters:
   - Profit;
   - Nominal weight;
