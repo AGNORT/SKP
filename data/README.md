@@ -8,13 +8,13 @@ We used two sets of benchmark instances to test our exact method:
 All instances share the same following format:
 
 - First line – Three values:
-  - The number of items (*n*);
-  - The bin capacity (*q*);
-  - The impact of the submodular weight ($\rho$).
+  - The number of items $n$;
+  - The bin capacity $q$;
+  - The impact of the submodular weight $\rho$.
 - Next *n* lines – Each line corresponds to one item and contains its three parameters:
-  - Profit;
-  - Nominal weight;
-  - Submodular weight.
+  - Profit $p_i$;
+  - Nominal weight $a_i$;
+  - Submodular weight $b_i$.
 
 ## References
 
