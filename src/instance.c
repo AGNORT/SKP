@@ -1,7 +1,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "instance.h"
-
-#include <stdbool.h>
+#include <math.h>
 #include <string.h>
 //#include <zlib.h>
 
@@ -53,6 +52,9 @@ int parse_header(Instance* RESTRICT inst, const Triple* RESTRICT triple) {
     alloc_vect(inst->p_ptr);
     alloc_vect(inst->p_weight);
 
+    inst->equal_p_a = true;
+    inst->ratio_sigma_a_const = true;
+
     return SUCCESS;
 }
 
@@ -63,12 +65,14 @@ typedef struct {
 int parse_body(ParseBodyState* state, Instance* RESTRICT inst,
     Triple* RESTRICT triple) {
 
-    inst->p_ptr[state->line] = atof(triple->a);
-    inst->a_ptr[state->line] = atof(triple->b);
-    inst->b_ptr[state->line] = atof(triple->c);
-    inst->p_weight[state->line] = atof(triple->a) / (atof(triple->b) + inst->rho*sqrt(atof(triple->c)));
-
-    state->line++;
+    if (atof(triple->b) + inst->rho*sqrt(atof(triple->c)) <= inst->capacity) {
+        inst->p_ptr[state->line] = atof(triple->a);
+        inst->a_ptr[state->line] = atof(triple->b);
+        inst->b_ptr[state->line] = atof(triple->c);
+        inst->p_weight[state->line] = atof(triple->a) / (atof(triple->b) + inst->rho*sqrt(atof(triple->c)));
+        inst->n_items_eff++;
+        state->line++;
+    }
 
     return SUCCESS;
 }
@@ -77,37 +81,29 @@ int parse_body(ParseBodyState* state, Instance* RESTRICT inst,
     if (f)                                                                     \
         return FAILURE;
 
-//int instance_parse(Instance * RESTRICT inst,
-//                   const char *const RESTRICT file_path) {
-//
-//    gzFile file = gzopen(file_path, "rb");
-//    if (file == NULL)
-//        return FAILURE;
-//
-//    char *line = malloc(BUFF_SIZE * sizeof(char));
-//    if (line == NULL)
-//        return FAILURE;
-//
-//    bool first = true;
-//    ParseBodyState state = {0};
-//    while (gzgets(file, line, BUFF_SIZE) != NULL) {
-//        Triple triple = {0};
-//        tokenize_line(&triple, line);
-//        if (first) {
-//            run_or_fail(parse_header(inst, &triple));
-//            first = false;
-//        } else {
-//            run_or_fail(parse_body(&state, inst, &triple));
-//        }
-//    }
-//
-//    free(line);
-//    gzclose(file);
-//    return SUCCESS;
-//}
+int check_equal_p_a(Instance* RESTRICT inst) {
+    for (int i=0; i < inst->n_items; i++) {
+        if (fabs(inst->p_ptr[i] - inst->a_ptr[i]) > EX) {
+            inst->equal_p_a = false;
+            break;
+        }
+    }
+    return SUCCESS;
+}
+
+int check_ratio_sigma_a_const(Instance* RESTRICT inst) {
+    double ratio = sqrt(inst->b_ptr[0])/inst->a_ptr[0];
+    for (int i=1; i < inst->n_items; i++) {
+        if (fabs((sqrt(inst->b_ptr[i])/inst->a_ptr[i]) - ratio) > EX) {
+            inst->ratio_sigma_a_const = false;
+            break;
+        }
+    }
+    return SUCCESS;
+}
 
 int instance_parse(Instance* RESTRICT inst, const char* const RESTRICT file_path) {
-    FILE* file = fopen(file_path, "r");  // ´ò¿ªÆÕÍ¨ÎÄ±¾ÎÄ¼þ
+    FILE* file = fopen(file_path, "r");  // ï¿½ï¿½ï¿½ï¿½Í¨ï¿½Ä±ï¿½ï¿½Ä¼ï¿½
     if (file == NULL)
         return FAILURE;
 
@@ -131,6 +127,13 @@ int instance_parse(Instance* RESTRICT inst, const char* const RESTRICT file_path
             run_or_fail(parse_body(&state, inst, &triple));
         }
     }
+    inst->n_items = inst->n_items_eff;
+
+    run_or_fail(check_equal_p_a(inst));
+    run_or_fail(check_ratio_sigma_a_const(inst));
+
+    printf("Check p_i = a_i for each i: %d\n", inst->equal_p_a);
+    printf("Check sigma_i/a_i const for each i: %d\n", inst->ratio_sigma_a_const);
 
     free(line);
     fclose(file);

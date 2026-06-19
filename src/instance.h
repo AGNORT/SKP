@@ -11,12 +11,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
 #include "macros.h"
+
+#define EX 1e-8
 
 typedef struct {
 	size_t n_items;			// number of items
@@ -26,6 +28,9 @@ typedef struct {
 	double* p_weight;       // profit per weight
 	double capacity;		// knapsack capacity
 	double rho;				// risk parameter
+	size_t n_items_eff;
+	bool ratio_sigma_a_const;
+	bool equal_p_a;
 } Instance;
 
 int instance_parse(Instance *RESTRICT, const char* const RESTRICT);

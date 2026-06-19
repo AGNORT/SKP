@@ -14,8 +14,8 @@ extern "C" {
 }
 #endif
 
-#define EX 1e-8
-#define MAXMUMSOLTIME 3600
+#define EX 1e-6
+#define MAXSOLTIME 3600
 
 #include <iostream>
 #include <vector>

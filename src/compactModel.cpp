@@ -3,14 +3,14 @@
 
 using namespace std;
 
-int g_gurobi_setting = 1;          //Linearized, outer Approximation + Dual Simplex: MIQCPMethod = 1, Method = 1;
-                        //2;        //Linearized, outer Approximation + Primal Simplex: MIQCPMethod = 1, Method = 0;
-                        //3;        //Conic + Barrier: MIQCPMethod = 0, Method = 2 (that should be what we already have, but let's make MIQCPMethod explicit);
-                        //4;        //Gurobi default settings without specifying anything.
+int g_gurobi_setting = 4; // 1;         // Linearized, outer Approximation + Dual Simplex: MIQCPMethod = 1, Method = 1;
+                            //2;        // Linearized, outer Approximation + Primal Simplex: MIQCPMethod = 1, Method = 0;
+                            //3;        // Conic + Barrier: MIQCPMethod = 0, Method = 2;
+                            //4;        // Gurobi default settings without specifying anything.
 
-//call the gurobi solver to solve the compact SOCP model of submodular knapsack problem
+// Call the GuRoBi solver to solve the compact SOCP model of the SKP
 void SolveCompactKnapsackModel(Args& args) {
-    //read instance
+    // Read instance
     Instance instance = { 0 };
     if (instance_parse(&instance, args.input_file)) {
         cerr << "Error reading instance file" << endl;
@@ -24,17 +24,17 @@ void SolveCompactKnapsackModel(Args& args) {
         env.start();
         GRBModel model = GRBModel(env);
 
-        //variable specify if the item i is selected
+        // Variable to specify if the item i is selected
         GRBVar* x = model.addVars(instance.n_items, GRB_BINARY);
         GRBVar t = model.addVar(0.0, GRB_INFINITY, 0.0, GRB_CONTINUOUS);
 
-        //set objective function
+        // Set objective function
         GRBLinExpr obj = 0;
         for (int i = 0; i < instance.n_items; ++i)
             obj += instance.p_ptr[i] * x[i];
         model.setObjective(obj, GRB_MAXIMIZE);  
 
-        //set SOCP constraints
+        // Set SOCP constraints
         GRBLinExpr lhs = 0;
         for (int j = 0; j < instance.n_items; ++j)
             lhs += instance.a_ptr[j] * x[j];
@@ -46,9 +46,11 @@ void SolveCompactKnapsackModel(Args& args) {
 
         // Set the model parameters
         model.set(GRB_DoubleParam_MIPGap, 1e-6);
-        model.set(GRB_DoubleParam_FeasibilityTol, 1e-9);
-        model.set(GRB_DoubleParam_OptimalityTol, 1e-9);
-        model.set(GRB_DoubleParam_IntFeasTol, 1e-9);
+        model.set(GRB_DoubleParam_FeasibilityTol, 1e-8);
+        model.set(GRB_DoubleParam_OptimalityTol, 1e-8);
+        model.set(GRB_DoubleParam_IntFeasTol, 1e-8);
+        model.set(GRB_IntParam_NumericFocus, 1); // Max numerical accuracy (values from 1 to 3)
+
         if (g_gurobi_setting == 1) {
             model.set(GRB_IntParam_MIQCPMethod, 1);
             model.set(GRB_IntParam_Method, 1);
@@ -62,21 +64,21 @@ void SolveCompactKnapsackModel(Args& args) {
             model.set(GRB_IntParam_Method, 2);
         }
         else if (g_gurobi_setting == 4) {
-            //Leave it default
+            // Leave it default
         }
         else {
             cerr << "Gurobi setting not specified! Pease the global variable 'g_gurobi_setting'" << endl;
             exit(-1);
         }
 
-        model.set(GRB_DoubleParam_TimeLimit, 7200.0);        //set maximum solution time
+        model.set(GRB_DoubleParam_TimeLimit, GRBMAXSOLTIME); // Set maximum solution time
 
-        // solve the model
+        // Solve the model
         model.optimize();
 
         cout << "***************The results obtained by Gurobi**************" << endl;
         outPut << "\n\n***************The results obtained by Gurobi**************" << endl;
-        // output the results
+        // Output results
         if (model.get(GRB_IntAttr_Status) == GRB_OPTIMAL) {
             cout << "The optimal objective value is :" << model.get(GRB_DoubleAttr_ObjVal) << endl;
             cout << "The solution time is :" << model.get(GRB_DoubleAttr_Runtime) << endl;
@@ -86,14 +88,19 @@ void SolveCompactKnapsackModel(Args& args) {
             outPut << "The chosen items are as follows: " << endl;
 
             int itemNum = 0;
+            double weight_occupied_a = 0.0;
+            double weight_occupied_b = 0.0;
             for (int i = 0; i < instance.n_items; i++) {
                 if (x[i].get(GRB_DoubleAttr_X) >= 0.9) {
                     ++itemNum;
                     cout << i << ",";
                     outPut << i << ",";
+                    weight_occupied_a += instance.a_ptr[i];
+                    weight_occupied_b += instance.b_ptr[i];
                 }
             }
             cout << endl;
+            cout << "The total weight occupied is: " << weight_occupied_a + instance.rho*sqrt(weight_occupied_b) << endl;
             cout << "The total number of chosen items is: " << itemNum << endl;
             outPut << endl;
             outPut << "The total number of chosen items is: " << itemNum << endl;
@@ -109,15 +116,20 @@ void SolveCompactKnapsackModel(Args& args) {
             outPut << "The best objective value found is: " << bestObjVal << endl;
 
             int itemNum = 0;
+            double weight_occupied_a = 0.0;
+            double weight_occupied_b = 0.0;
             for (int i = 0; i < instance.n_items; i++) {
                 if (x[i].get(GRB_DoubleAttr_X) >= 0.9) {
                     ++itemNum;
                     cout << i << ",";
                     outPut << i << ",";
+                    weight_occupied_a += instance.a_ptr[i];
+                    weight_occupied_b += instance.b_ptr[i];
                 }
             }
             cout << endl;
             cout << "The total number of chosen items is: " << itemNum << endl;
+            cout << "The total weight occupied is: " << weight_occupied_a + instance.rho*sqrt(weight_occupied_b) << endl;
             outPut << endl;
             outPut << "The total number of chosen items is: " << itemNum << endl;
             std::cout << "t = " << t.get(GRB_DoubleAttr_X) << std::endl;
@@ -141,6 +153,6 @@ void SolveCompactKnapsackModel(Args& args) {
     }
 
     outPut.close();
-    //free space
+    // Free space
     instance_free(&instance);
 }

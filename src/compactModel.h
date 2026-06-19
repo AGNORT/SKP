@@ -9,6 +9,7 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+#define GRBMAXSOLTIME 3600
 
 #include <iostream>
 #include <vector>

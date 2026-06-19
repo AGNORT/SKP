@@ -1,48 +1,49 @@
-﻿/****************The second version****************/
-#include "labelSetting.h"
+﻿#include "labelSetting.h"
 #include "compactModel.h"
+#include <cmath>
+#include <climits>
 
 using namespace std;
 
-Instance g_instance = { 0 };					//g_instance data
+Instance g_instance = { 0 };					// g_instance data
 
 /*parameters*/
-int g_tolItemNum = 0;							//the total number of items
-int g_firstDim = 0;								//the first dimension of the bucket
-int secondDim = 0;								//the second dimension of the bucket
-double g_bestLB = 0;								//the best lower bound		
-int g_secondDimDiv = 1;							//the divisor for second dimension of the bucket
-double g_smallest_bDiva = 1e10;					//the smallest ratio of a/b for the present instance	
+int g_tolItemNum = 0;							// the total number of items
+int g_firstDim = 0;								// the first dimension of the bucket
+int secondDim = 0;								// the second dimension of the bucket
+double g_bestLB = 0;							// the best lower bound		
+int g_secondDimDiv = 4;							// the divisor for second dimension of the bucket
+double g_smallest_bDiva = 1e10;					// the smallest ratio of a/b for the present instance	
 
-vector<double> g_profitRec;						//the profit record from each item
+vector<double> g_profitRec;						// the profit record from each item
 
 /*bucket index*/
-std::vector<int> g_item_to_firstIdx;			//map item to item bucket index
-std::vector<int> g_weight_to_secondIdx;			//map weight to capacity bucket index
-int g_domWidth = 6;								//the width of buckets dominance check
-bool g_pInteger = true;						//remark if parameter p is integer 
-bool g_aInteger = true;						//remark if parameter a is integer 
+std::vector<int> g_item_to_firstIdx;			// map item to item bucket index
+std::vector<int> g_weight_to_secondIdx;			// map weight to capacity bucket index
+int g_domWidth = 3;								// the width of buckets dominance check in [0, 1, 3, 6, 10, 15, 20, INT_MAX]
+bool g_pInteger = true;							// remark if parameter p is integer 
+bool g_aInteger = true;							// remark if parameter a is integer 
 
 /*results*/
-int g_tolGeneratedLabel = 0;					//the total number of generated labels
-int g_nonDominatedLabel = 0;					//the total number of non-dominated labels
-int g_CBFathomLabel = 0;						//the number of labels fathomed by CB
-int g_dominatedLabel = 0;						//the number of labels fathomed by dominance rules
+bool HLA_optimal = false;
+int g_tolGeneratedLabel = 0;					// the total number of generated labels
+int g_nonDominatedLabel = 0;					// the total number of non-dominated labels
+int g_CBFathomLabel = 0;						// the number of labels fathomed by CB
+int g_dominatedLabel = 0;						// the number of labels fathomed by dominance rules
 
 /*Components included in the algorithm*/
-bool g_use_strong_dom_rules = true;				//if the strong dominance rules are used
-bool g_use_CB = true;							//if the completion bound is used
-bool g_use_TS = true;							//if the TS is used
-bool g_use_HLA = true;							//if the HLA is used
-int g_labeling_stgy = 1;						//default setting one, strong dom + CB + TS + HLA
-//2;					//setting two: strong dom without {CB + TS + HLA}
-//3;					//setting three: strong dom + CB + TS
-//4;					//setting four: strong dom + CB + HLA
-						//5;					//setting five: normal dom + CB + TS + HLA
-						//6;					//setting six: normal dom without {CB + TS + HLA}
-						//7;					//setting seven: normal dom + CB + TS
-						//8;					//setting eight: normal dom + CB + HLA
-
+bool g_use_strong_dom_rules = true;				// if the strong dominance rules are used
+bool g_use_CB = true;							// if the completion bound is used
+bool g_use_TS = true;							// if the TS is used
+bool g_use_HLA = true;							// if the HLA is used
+int g_labeling_stgy = 3;						// 1; default setting one, strong dom + CB + TS + HLA
+												// 2; setting two: strong dom without {CB + TS + HLA}
+												// 3; setting three: strong dom + CB + TS
+												// 4; setting four: strong dom + CB + HLA
+												// 5; setting five: normal dom + CB + TS + HLA
+												// 6; setting six: normal dom without {CB + TS + HLA}
+												// 7; setting seven: normal dom + CB + TS
+												// 8;setting eight: normal dom + CB + HLA
 
 /*sort the instances according to the sum of a and b*/
 // ascending sort
@@ -125,7 +126,7 @@ void sort_instance_by_profit(Instance& instance) {
 	free(indices);
 }
 
-//convert vector to string
+// convert vector to string
 std::string JoinVector(const std::vector<int>& vec) {
 	std::ostringstream oss;
 	for (size_t i = 0; i < vec.size(); ++i) {
@@ -190,11 +191,11 @@ int FKP(const Instance* RESTRICT const inst,
 	}
 
 	item_list_free(&item_list);
-	//free(weight_to_secondIdx);
+	// free(weight_to_secondIdx);
 	return SUCCESS;
 }
 
-//label extention
+// label extention
 void LabelExtention(
 	Instance& preInstance,
 	MyLabel* parentLab,
@@ -209,94 +210,55 @@ void LabelExtention(
 	preLab->parentLab = parentLab;
 }
 
-//Judge same label
+// Evaluate/judge same label
 bool JudgeEquality(MyLabel* lab1, MyLabel* lab2) {
-	return abs(lab1->tolProfit - lab2->tolProfit) <= EX &&
-		abs(lab1->tolWeight - lab2->tolWeight) <= EX &&
-		abs(lab1->sum_a - lab2->sum_a) <= EX;
+	if (g_instance.equal_p_a)
+		return std::abs(lab1->sum_a - lab2->sum_a) <= EX &&
+			std::abs(lab1->sum_b - lab2->sum_b) <= EX;
+	
+	return std::abs(lab1->tolProfit - lab2->tolProfit) <= EX &&
+		std::abs(lab1->tolWeight - lab2->tolWeight) <= EX &&
+		std::abs(lab1->sum_a - lab2->sum_a) <= EX;
 }
 
-//dominance rules
+// dominance rules
 bool JgeLabDominance(MyLabel* lab1, MyLabel* lab2, bool heuDom) {
-	if (!heuDom) {//exact dominance rules
-		if (!g_pInteger) {
+	if (!heuDom) {// exact dominance rules
+		if (g_instance.equal_p_a) { // Subset Sum where p_i = a_i for each i \in N
+			if (lab1->sum_a < lab2->sum_a - EX) return false;
+			if (std::abs(lab1->sum_a - lab2->sum_a) <= EX) return lab1->sum_b < lab2->sum_b;
+			return false;
+		}
+		else {
+			// Check if one condition is not satisfied
 			if (lab1->tolProfit < lab2->tolProfit - EX) return false;
-		}
-		else {
-			if ((int)lab1->tolProfit < (int)lab2->tolProfit) return false;
-		}
-		if (!g_use_strong_dom_rules) {
-			if (lab1->sum_b > lab2->sum_b + EX) 
-				return false; //old weaker version
-		}
-		else {
-			if (lab1->tolWeight > lab2->tolWeight + EX) 
-				return false; //new strong version
-		}
-		if (!g_aInteger) {
 			if (lab1->sum_a > lab2->sum_a + EX) return false;
-		}
-		else {
-			if ((int)lab1->sum_a > (int)lab2->sum_a) return false;
-		}
 
-		if (!g_use_strong_dom_rules) {
-			if (g_pInteger && !g_aInteger) {
-				if (
-					(int)lab1->tolProfit > (int)lab2->tolProfit ||
-					lab1->sum_b < lab2->sum_b - EX || //old weaker version
-					lab1->sum_a < lab2->sum_a - EX) return true;
+			if (!g_use_strong_dom_rules) {
+				if (lab1->sum_b > lab2->sum_b + EX) return false; // Weak Dominance Rule
+			} else {
+				if (lab1->tolWeight > lab2->tolWeight + EX) return false; // Strong Dominance Rule
 			}
-			else if (!g_pInteger && g_aInteger) {
-				if (
-					lab1->tolProfit > lab2->tolProfit + EX ||
-					lab1->sum_b < lab2->sum_b - EX || //old weaker version
-					(int)lab1->sum_a < (int)lab2->sum_a) return true;
-			}
-			else if (!g_pInteger && !g_aInteger) {
-				if (
-					lab1->tolProfit > lab2->tolProfit + EX ||
-					lab1->sum_b < lab2->sum_b - EX || //old weaker version
-					lab1->sum_a < lab2->sum_a - EX) return true;
-			}
-			else {//(g_pInteger && g_aInteger)
-				if (
-					(int)lab1->tolProfit > (int)lab2->tolProfit ||
-					lab1->sum_b < lab2->sum_b - EX || //old weaker version
-					(int)lab1->sum_a < (int)lab2->sum_a) return true;
-			}
-		}
-		else {
-			if (g_pInteger && !g_aInteger) {
-				if (
-					(int)lab1->tolProfit > (int)lab2->tolProfit ||
-					lab1->tolWeight < lab2->tolWeight - EX ||
-					lab1->sum_a < lab2->sum_a - EX) return true;
-			}
-			else if (!g_pInteger && g_aInteger) {
-				if (
-					lab1->tolProfit > lab2->tolProfit + EX ||
-					lab1->tolWeight < lab2->tolWeight - EX ||
-					(int)lab1->sum_a < (int)lab2->sum_a) return true;
-			}
-			else if (!g_pInteger && !g_aInteger) {
-				if (
-					lab1->tolProfit > lab2->tolProfit + EX ||
-					lab1->tolWeight < lab2->tolWeight - EX ||
-					lab1->sum_a < lab2->sum_a - EX) return true;
-			}
-			else {//(g_pInteger && g_aInteger)
-				if (
-					(int)lab1->tolProfit > (int)lab2->tolProfit ||
-					lab1->tolWeight < lab2->tolWeight - EX ||
-					(int)lab1->sum_a < (int)lab2->sum_a) return true;
-			}
-		}
-		
 
-		return false;
+			// Check if at least one condition is satisfied with strict inequality
+			if (!g_use_strong_dom_rules) {
+				if (lab1->tolProfit > lab2->tolProfit + EX ||
+					lab1->sum_b < lab2->sum_b - EX || // Weak Dominance Rule
+					lab1->sum_a < lab2->sum_a - EX) {
+					return true;
+				}
+			} else {
+				if (lab1->tolProfit > lab2->tolProfit + EX ||
+					lab1->tolWeight < lab2->tolWeight - EX ||
+					lab1->sum_a < lab2->sum_a - EX) {
+					return true;
+				}
+			}
+
+			return false;
+		}
 	}
-	else {//heurisitc dominance rules
+	else {// heuristic dominance rules
 		if (lab1->tolProfit < lab2->tolProfit - EX) return false;
 		if (lab1->tolWeight > lab2->tolWeight + EX) return false;
 
@@ -308,7 +270,7 @@ bool JgeLabDominance(MyLabel* lab1, MyLabel* lab2, bool heuDom) {
 	}
 }
 
-//completion bound
+// completion bound
 int CompletionBound(
 	MyLabel* lab,
 	int prefirstIdx,
@@ -316,7 +278,16 @@ int CompletionBound(
 ) {
 	if (!g_use_CB)
 		return false;
-	//strengthened completion bound
+	
+	// Subset Sum where p_i = a_i for each item
+	if (g_instance.equal_p_a){
+		if (lab->tolProfit + g_instance.capacity - lab->tolWeight <= g_bestLB + EX) {
+			return true;
+		}
+		return false;
+	}
+
+	// Strengthened completion bound
 	size_t i = ub_matr->cols - prefirstIdx - 1;
 	int secondIdx = g_weight_to_secondIdx[(size_t)ceil(lab->tolWeight)];
 	size_t j = ub_matr->rows - secondIdx - 1;
@@ -330,7 +301,7 @@ int CompletionBound(
 	return false;
 }
 
-//label dominance
+// label dominance
 void JgeDominance(
 	vector<multimap<double, MyLabel*, greater<double>>>& newExtended,
 	vector<multimap<double, MyLabel*, greater<double>>>& oldExtended,
@@ -339,13 +310,13 @@ void JgeDominance(
 	bool newLabelFlag = true,
 	bool heuDom = false,
 	bool dualCalFlag = false) {
-	//find the dimension of the bucket
+	// find the dimension of the bucket
 	int secondIdx = g_weight_to_secondIdx[(size_t)ceil(lab->tolWeight)];
 
-	//use the present label to dominate other labels in the bucket
+	// use the present label to dominate other labels in the bucket
 	int j = secondIdx;
 	while (j < secondDim) {
-		//dominate the labels in the new bucket
+		// dominate the labels in the new bucket
 		if (!newExtended[j].empty() &&
 			lab->tolProfit >= (--newExtended[j].end())->first) {
 			auto ite = newExtended[j].begin();
@@ -368,7 +339,7 @@ void JgeDominance(
 					ite = newExtended[j].erase(ite);
 					continue;
 				}
-				else {//Judge label equality
+				else {// Judge label equality
 					if (JudgeEquality(lab, ite->second)) {
 						if (dualCalFlag) {
 							delete ite->second;
@@ -399,10 +370,11 @@ void JgeDominance(
 }
 
 
-//get the initial lower bound
+
+// get the initial lower bound
 double GetInitialLowerBound(double& bestLB) {
 	Instance instance = g_instance;
-	//instance profit
+	// instance profit
 	sort_instance_by_profit(instance);
 
 	double sum_a = 0;
@@ -421,7 +393,7 @@ double GetInitialLowerBound(double& bestLB) {
 	return bestLB;
 }
 
-//initialize g_profitRec
+// initialize g_profitRec
 void InitProfitRec() {
 	vector<int> tmp(g_instance.n_items, 0);
 	g_profitRec.resize(g_instance.n_items, 0);
@@ -436,7 +408,7 @@ void InitProfitRec() {
 		g_profitRec[i] = tolProfit - tmp[i];
 }
 
-//The whole dominance logic
+// The whole dominance logic
 bool DominanceLogic(
 	int preSecondIdx,
 	vector<multimap<double, MyLabel*, greater<double>>>*& newExtended,
@@ -448,22 +420,21 @@ bool DominanceLogic(
 	int j = preSecondIdx;
 	while (j >= 0) {
 		auto& preBkt = (*newExtended)[j];
-		//use newExtended labels to dominante
+		// use newExtended labels to dominante
 		auto domIite = preBkt.begin();
 		int cnt = 0;
 		int preSize = preBkt.size();
 		while (cnt < preSize) {
 			if (domIite->first < preLab->tolProfit) break;
-			//judge dominance
+			// Judge dominance
 			if (JgeLabDominance(domIite->second, preLab, heuDom)) {
 				dominanceFlag = true;
 				break;
 			}
 			else {
-				//judge equality
+				// judge equality
 				if (JudgeEquality(domIite->second, preLab)) {
 					dominanceFlag = true;
-					//cout << "Equal label 1" << endl;
 					break;
 				}
 			}
@@ -472,25 +443,23 @@ bool DominanceLogic(
 		}
 		if (dominanceFlag) break;
 
-		//old labels don't need to be checked from old labels, since it's checked during the geration of the new label
+		// Old labels don't need to be checked with old labels, since this was checked during the generation of the new label
 		if (newLabelFalg) {
 			auto& preBkt = (*oldExtended)[j];
 			auto domIite = preBkt.begin();
 			int cnt = 0;
 			int preSize = preBkt.size();
-			//while (domIite != preBkt.end()) {
 			while (cnt < preSize) {
 				if (domIite->first < preLab->tolProfit) break;
-				//judge dominance
+				// judge dominance
 				if (JgeLabDominance(domIite->second, preLab, heuDom)) {
 					dominanceFlag = true;
 					break;
 				}
 				else {
-					//judge equality
+					// judge equality
 					if (JudgeEquality(domIite->second, preLab)) {
 						dominanceFlag = true;
-						//cout << "Equal label 2" << endl;
 						break;
 					}
 				}
@@ -508,23 +477,22 @@ bool DominanceLogic(
 }
 
 
-//use the heuristic labeling algorithm with heuristic dominance rules to solve the submodular knapsack problem
+// use the heuristic labeling algorithm with heuristic dominance rules to solve the submodular knapsack problem
 void LabelSettingHeuristic(
 	DblMatrix& ub_matr,
-	double& heuLableTime,
+	double& heuLabelTime,
 	const ItemIndex* indicesRec,
 	vector<double>& SR3Duals,
 	vector<unordered_set<int>>& SR3s,
 	unordered_map<int, ItemIndex>& removedIndicesRec,
 	multimap<double, KnapsackSol, greater<double>>& finalSols
-	//ofstream& outPut
 ) {
 	auto startTime = chrono::high_resolution_clock::now();
 
-	//initialize the bucket
+	// initialize the bucket
 	vector<multimap<double, MyLabel*, greater<double>>>* oldExtended = new vector<multimap<double, MyLabel*, greater<double>>>(secondDim + 1, multimap<double, MyLabel*, greater<double>>());
 	vector<multimap<double, MyLabel*, greater<double>>>* newExtended = new vector<multimap<double, MyLabel*, greater<double>>>(secondDim + 1, multimap<double, MyLabel*, greater<double>>());
-	vector<MyLabel*> dominatedOldLabs;	//record the dominated old labels
+	vector<MyLabel*> dominatedOldLabs;	// record the dominated old labels
 	dominatedOldLabs.reserve(1e+6);
 	vector<int> nonDominatedLabsRec(g_firstDim);
 
@@ -532,16 +500,18 @@ void LabelSettingHeuristic(
 	oldExtended->begin()->insert({ 0, initLab });
 	// ++g_tolGeneratedLabel;
 
-	//label extention and dominance
-	int currItem = 0;				//record the current item to extend
+	// label extention and dominance
+	int currItem = 0;				// record the current item to extend
 	int thisNonDominatedLabel = 0;
+	double actual_sum_a = 0; 
+	double actual_sum_b = 0;
 	for (int stage = 0; stage < g_firstDim; ++stage) {
 		thisNonDominatedLabel = 0;
 		for (int sndBktIdx = 0; sndBktIdx <= secondDim; ++sndBktIdx) {
 			if ((*oldExtended)[sndBktIdx].empty()) continue;
 			auto ite = (*oldExtended)[sndBktIdx].begin();
 			while (ite != (*oldExtended)[sndBktIdx].end()) {
-				//check the if the old label can be discarded by CB
+				// check if the old label can be discarded by CB
 				bool keepOld = true;
 				if (CompletionBound(ite->second, currItem + 1, &ub_matr)) {
 					dominatedOldLabs.push_back(ite->second);
@@ -553,17 +523,17 @@ void LabelSettingHeuristic(
 
 				double preWeight = ite->second->sum_a + g_instance.a_ptr[currItem] +
 					g_instance.rho * sqrt(ite->second->sum_b + g_instance.b_ptr[currItem]);
-				if (preWeight <= g_instance.capacity + EX) {//judge capacity
-					//label extension
+				if (preWeight <= g_instance.capacity + EX) {// judge capacity
+					// label extension
 					MyLabel* tmpLab = new MyLabel(ite->second);
 					LabelExtention(g_instance, ite->second, tmpLab, currItem);
 					// ++g_tolGeneratedLabel;
 
-					//completion bound to fathom label
+					// completion bound to fathom label
 					if (CompletionBound(tmpLab, currItem + 1, &ub_matr)) {
-						//++g_CBFathomLabel;
+						// ++g_CBFathomLabel;
 						delete tmpLab; tmpLab = nullptr;
-						//before insert the old label, do the dominance check
+						// before insert the old label, do the dominance check
 						MyLabel* oldLab = ite->second;
 						ite = (*oldExtended)[sndBktIdx].erase(ite);
 						if (keepOld) {
@@ -579,24 +549,24 @@ void LabelSettingHeuristic(
 						continue;
 					}
 
-					//dominance check
+					// dominance check
 					int preSecondIdx = g_weight_to_secondIdx[(size_t)ceil(preWeight)];
 					bool dominanceFlag = DominanceLogic(preSecondIdx, newExtended, oldExtended, tmpLab, true, true);
 
 					if (dominanceFlag) {
 						delete tmpLab;
 						tmpLab = nullptr;
-						//++g_dominatedLabel;
+						// ++g_dominatedLabel;
 					}
 					else {
-						//dominate other labels
+						// dominate other labels
 						JgeDominance((*newExtended), (*oldExtended), tmpLab, dominatedOldLabs, true, true);
-						//add the non dominated label into the new extended bucket
+						// add the non dominated label into the new extended bucket
 						(*newExtended)[preSecondIdx].insert({ tmpLab->tolProfit, tmpLab });
 					}
 				}
 
-				//before insert the old label, do the dominance check
+				// before insert the old label, do the dominance check
 				MyLabel* oldLab = ite->second;
 				ite = (*oldExtended)[sndBktIdx].erase(ite);
 				if (keepOld) {
@@ -608,27 +578,33 @@ void LabelSettingHeuristic(
 						continue;
 					}
 					else {
-						//save the current label to the new extended bucket
+						// save the current label to the new extended bucket
 						(*newExtended)[sndBktIdx].insert({ oldLab->tolProfit, oldLab });
 					}
 				}
 			}
 			thisNonDominatedLabel += (*newExtended)[sndBktIdx].size();
-			//use the present best dual variable to update
+			// use the present best dual variable to update
 			if (!(*newExtended)[sndBktIdx].empty()) {
 				if ((*newExtended)[sndBktIdx].begin()->first > g_bestLB) {
 					KnapsackSol preSol;
 					preSol.bestLab = new MyLabel((*newExtended)[sndBktIdx].begin()->second);
-					//get the item set
+					// get the item set and check actual weight
 					if (preSol.bestLab->itemSet.empty())
 						preSol.bestLab->itemSet.resize(g_instance.n_items + removedIndicesRec.size());
 					auto tmpLab = preSol.bestLab;
+					actual_sum_a = 0.0;
+					actual_sum_b = 0.0;
 					while (tmpLab->parentLab != nullptr) {
+						actual_sum_a += g_instance.a_ptr[tmpLab->lastItem];
+						actual_sum_b += g_instance.b_ptr[tmpLab->lastItem];
 						preSol.bestLab->itemSet[indicesRec[tmpLab->lastItem].index] = 1;
 						tmpLab = tmpLab->parentLab;
 					}
-					finalSols.insert({ (*newExtended)[sndBktIdx].begin()->first, preSol });
-					g_bestLB = max(g_bestLB, (*newExtended)[sndBktIdx].begin()->first);
+					if (actual_sum_a + g_instance.rho*sqrt(actual_sum_b) <= g_instance.capacity + EX) {
+						finalSols.insert({ (*newExtended)[sndBktIdx].begin()->first, preSol });
+						g_bestLB = max(g_bestLB, (*newExtended)[sndBktIdx].begin()->first);
+					}
 				}
 			}
 		}
@@ -640,7 +616,7 @@ void LabelSettingHeuristic(
 		nonDominatedLabsRec[stage] = thisNonDominatedLabel;
 	}
 
-	//record the best solution
+	// record the best solution for HLA
 	auto ite = --(*oldExtended).end();
 	MyLabel* bestLab = nullptr;
 	while (true) {
@@ -655,6 +631,7 @@ void LabelSettingHeuristic(
 				KnapsackSol preSol;
 				preSol.bestLab = subIte->second;
 				finalSols.insert({ subIte->second->tolProfit, preSol });
+				g_bestLB = max(g_bestLB, finalSols.begin()->first);
 				subIte = ite->erase(subIte);
 			}
 		}
@@ -662,8 +639,9 @@ void LabelSettingHeuristic(
 			break;
 		--ite;
 	}
+	string bestItemSet;
 	if (bestLab != nullptr && bestLab->lastItem > 0) {
-		//get the item set
+		// get the item set
 		vector<int> bestIS;
 		MyLabel* tmpLab = bestLab;
 		while (tmpLab->parentLab != nullptr) {
@@ -671,9 +649,9 @@ void LabelSettingHeuristic(
 			tmpLab = tmpLab->parentLab;
 		}
 		sort(bestIS.begin(), bestIS.end());
-		string bestItemSet = JoinVector(bestIS);
+		bestItemSet = JoinVector(bestIS);
 		finalSols.begin()->second.bestItemSet = bestItemSet;
-		//get the item set for all the solutions
+		// get the item set for all the solutions
 		for (auto& e : finalSols) {
 			if (e.second.bestLab->itemSet.empty())
 				e.second.bestLab->itemSet.resize(g_instance.n_items + removedIndicesRec.size());
@@ -684,30 +662,31 @@ void LabelSettingHeuristic(
 			}
 		}
 	}
-	//free space
+
+	// free space
 	for (auto& t : (*oldExtended)) {
 		for (auto& e : t)
 			delete e.second;
 	}
 	delete oldExtended;
 	delete newExtended;
-	//g_dominatedLabel += dominatedOldLabs.size();
+	// g_dominatedLabel += dominatedOldLabs.size();
 	for (auto& t : dominatedOldLabs)
 		delete t;
 	// g_nonDominatedLabel = thisNonDominatedLabel;
-	//cout << "The trend of non dominated labels in heuristic label algorithm: " << endl;
-	//outPut << "The trend of non dominated labels in heuristic label algorithm: " << endl;
-	//for (auto& e : nonDominatedLabsRec) {
-	//	cout << e << "\t";
-	//	outPut << e << "\t";
-	//}
+	// cout << "The trend of non dominated labels in heuristic label algorithm: " << endl;
+	// outPut << "The trend of non dominated labels in heuristic label algorithm: " << endl;
+	// for (auto& e : nonDominatedLabsRec) {
+	// 	cout << e << "\t";
+	// 	outPut << e << "\t";
+	// }
 	cout << endl;
-	//outPut << endl;
+	// outPut << endl;
 	auto endTime = chrono::high_resolution_clock::now();
-	heuLableTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime).count() / 1000.0;
+	heuLabelTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime).count() / 1000.0;
 }
 
-//test solution
+// test solution
 bool TestSolution(Instance& preInstance, vector<int>& sol_items) {
 	double sum_a = 0;
 	double sum_b = 0;
@@ -729,7 +708,7 @@ bool TestSolution(Instance& preInstance, vector<int>& sol_items) {
 	}
 }
 
-//design the labelsetting algorithm to solve the submodular knapsack problem
+// design the labelsetting algorithm to solve the submodular knapsack problem
 int LabelSettingSolveKnapsack(Args& args) {
 	auto startTime = chrono::high_resolution_clock::now();
 	/*read g_instance*/
@@ -739,12 +718,12 @@ int LabelSettingSolveKnapsack(Args& args) {
 		return 0;
 	}
 	ofstream outPut(args.output_file, ios::app);
-	//judge if p and a is integer or not
+	// judge if p and a is integer or not
 	for (int i = 0; i < g_instance.n_items; ++i) {
-		if (abs(floor(g_instance.a_ptr[i]) - g_instance.a_ptr[i]) > EX) {
+		if (std::abs(floor(g_instance.a_ptr[i]) - g_instance.a_ptr[i]) > EX) {
 			g_aInteger = false;
 		}
-		if (abs(floor(g_instance.p_ptr[i]) - g_instance.p_ptr[i]) > EX) {
+		if (std::abs(floor(g_instance.p_ptr[i]) - g_instance.p_ptr[i]) > EX) {
 			g_pInteger = false;
 		}
 		double preRatio = g_instance.b_ptr[i] * 1.0 / (g_instance.a_ptr[i] * 1.0);
@@ -752,9 +731,9 @@ int LabelSettingSolveKnapsack(Args& args) {
 			g_smallest_bDiva = preRatio;
 	}
 
-	//specify the component used in the labeling
+	// specify the component used in the labeling
 	if (g_labeling_stgy == 1) {
-		//keep the default setting.
+		// keep the default setting.
 	}
 	else if (g_labeling_stgy == 2) {
 		g_use_CB = false;							
@@ -789,22 +768,22 @@ int LabelSettingSolveKnapsack(Args& args) {
 		exit(-1);
 	}
 
-	//specify the dimension of the bucket
-	g_tolItemNum = g_instance.n_items;			//the first dimension of the bucket
-	g_firstDim = g_instance.n_items / 1;		//the first dimension of the bucket
-	secondDim = g_instance.capacity / g_secondDimDiv;       //the second dimension of the bucket
+	// specify the dimension of the bucket
+	g_tolItemNum = g_instance.n_items;						// the first dimension of the bucket
+	g_firstDim = g_instance.n_items / 1;					// the first dimension of the bucket
+	secondDim = g_instance.capacity / g_secondDimDiv;       // the second dimension of the bucket
 
 	multimap<double, KnapsackSol, greater<double>> finalSols;
 	g_bestLB = 0;
-	//sort the instance according to p/(a+sqrt(b))
+	// sort the instance according to p/(a+sqrt(b))
 	ItemIndex* indicesRec = nullptr;
 	sort_instance_by_p_ab(g_instance, indicesRec);
 	/*use heuristic to get primal bound*/
 	auto heuPrimal_startTime = chrono::high_resolution_clock::now();
-	//TS heuristic
+	// TS heuristic
 	double ts_sol = 0;
 	if (g_use_TS) {
-		//get the initial lower bound
+		// get the initial lower bound
 		GetInitialLowerBound(g_bestLB);
 		vector<int> ts_sol_items(g_tolItemNum);
 		ts_sol = heuristic_solution(&g_instance, &ts_sol_items[0]);
@@ -828,9 +807,9 @@ int LabelSettingSolveKnapsack(Args& args) {
 		finalSols.insert({ ts_sol, preSol });
 	}
 	auto heuPrimal_endTime = chrono::high_resolution_clock::now();
-
+	
 	/*construct bucket index*/
-	int itemGap = g_instance.n_items / g_firstDim;	//the item gap for each item bucket
+	int itemGap = g_instance.n_items / g_firstDim;	// the item gap for each item bucket
 	g_item_to_firstIdx.resize(g_instance.n_items + 1, 0);
 	for (int j = 0; j <= g_firstDim; ++j) {
 		int startItem = j * itemGap;
@@ -840,7 +819,7 @@ int LabelSettingSolveKnapsack(Args& args) {
 			g_item_to_firstIdx[w] = j;
 	}
 	vector<double> weightRec(secondDim + 1, 0);
-	int weightGap = g_instance.capacity / secondDim;	//the capacity gap for each capacity bucket
+	int weightGap = g_instance.capacity / secondDim;	// the capacity gap for each capacity bucket
 	g_weight_to_secondIdx.resize(g_instance.capacity + 1, 0);
 	for (int j = 0; j <= secondDim; ++j) {
 		int startWeight = j * weightGap;
@@ -854,19 +833,19 @@ int LabelSettingSolveKnapsack(Args& args) {
 	auto LR_startTime = chrono::high_resolution_clock::now();
 	/*compute linear upper bound (dual bound)*/
 	DblMatrix ub_matr = { 0 };
-	if(g_use_CB){
+	if(g_use_CB) { // && !g_instance.equal_p_a){
 		dm_new(&ub_matr, g_instance.n_items + 1, secondDim + 1);
 		for (size_t i = 0; i <= g_instance.n_items; ++i) {
 			for (size_t j = 0; j <= secondDim; ++j) {
 				dm_set(&ub_matr, i, j, INFINITY);
 			}
 		}
-		FKP(&g_instance, &ub_matr, weightRec, false);//mask completion bound
+		FKP(&g_instance, &ub_matr, weightRec, false);// mask completion bound
 	}
 	auto LR_endTime = chrono::high_resolution_clock::now();
 
 	/*use the heuristic labeling algorithm to get better lower bound*/
-	double heuLableTime = 0;
+	double heuLabelTime = 0;
 	double dualBoundTime = 0; bool solvedFlag = true;
 	unordered_map<int, ItemIndex> removedIndicesRec;
 	vector<double> sr3Duals;
@@ -874,196 +853,259 @@ int LabelSettingSolveKnapsack(Args& args) {
 	vector<double> preciseDuals(g_instance.n_items, 0);
 	for (int i = 0; i < g_instance.n_items; ++i)
 		preciseDuals[i] = g_instance.p_ptr[i];
-	int HLA_sol = 0;
-	if (g_use_HLA) {
-		LabelSettingHeuristic(ub_matr, heuLableTime, indicesRec, sr3Duals, sr3s, removedIndicesRec, finalSols);//mask HLA
+	double HLA_sol = 0.0;
+	if (g_use_HLA || g_instance.ratio_sigma_a_const) {
+		LabelSettingHeuristic(ub_matr, heuLabelTime, indicesRec, sr3Duals, sr3s, removedIndicesRec, finalSols);// mask HLA
 		cout << "heuristic labeling get lower bound: " << g_bestLB << endl;
-		cout << "heuristic labeling use time: " << heuLableTime << "s" << endl;
+		cout << "heuristic labeling use time: " << heuLabelTime << "s" << endl;
 		HLA_sol = g_bestLB;
+		if (g_instance.ratio_sigma_a_const || (g_instance.equal_p_a && std::abs(g_bestLB - g_instance.capacity) < EX)) {
+			cout << "Optimal solution found with HLA " << endl;
+			outPut << "Optimal solution found with HLA " << endl;
+			cout << "The best item set is " << finalSols.begin()->second.bestItemSet << endl;
+			HLA_optimal = true;
+		}
 	}
 	
 	auto exactDP_startTime = chrono::high_resolution_clock::now();
-	//initialize the bucket
-	vector<multimap<double, MyLabel*, greater<double>>>* oldExtended = new vector<multimap<double, MyLabel*, greater<double>>>(secondDim + 1, multimap<double, MyLabel*, greater<double>>());
-	vector<multimap<double, MyLabel*, greater<double>>>* newExtended = new vector<multimap<double, MyLabel*, greater<double>>>(secondDim + 1, multimap<double, MyLabel*, greater<double>>());
-	vector<MyLabel*> dominatedOldLabs;	//record the dominated old labels
-	dominatedOldLabs.reserve(1e+6);
-	vector<int> nonDominatedLabsRec(g_firstDim);
-
-	MyLabel* initLab = new MyLabel();
-	oldExtended->begin()->insert({ 0, initLab });
-	++g_tolGeneratedLabel;
-
-	//label extention and dominance
-	int currItem = 0;				//record the current item to extend
-	bool timeLimitFlag = false;
 	int thisNonDominatedLabel = 0;
-	for (int stage = 0; stage < g_firstDim; ++stage) {
-		thisNonDominatedLabel = 0;
-		for (int sndBktIdx = 0; sndBktIdx <= secondDim; ++sndBktIdx) {
-			if ((*oldExtended)[sndBktIdx].empty()) continue;
-			auto ite = (*oldExtended)[sndBktIdx].begin();
-			while (ite != (*oldExtended)[sndBktIdx].end()) {
-				//check the if the old label can be discarded by CB
-				bool keepOld = true;
-				if (CompletionBound(ite->second, currItem + 1, &ub_matr)) {
-					dominatedOldLabs.push_back(ite->second);
-					keepOld = false;
-				}
-				else {
-					++g_tolGeneratedLabel;
-				}
+	double actual_sum_a = 0.0;
+	double actual_sum_b = 0.0;
+	string bestItemSet;
+	if (!g_instance.ratio_sigma_a_const && !HLA_optimal) { // If ratio_sigma_a_const = true or if HLA has found a best solution, skip ELA
+		// initialize the bucket
+		vector<multimap<double, MyLabel*, greater<double>>>* oldExtended = new vector<multimap<double, MyLabel*, greater<double>>>(secondDim + 1, multimap<double, MyLabel*, greater<double>>());
+		vector<multimap<double, MyLabel*, greater<double>>>* newExtended = new vector<multimap<double, MyLabel*, greater<double>>>(secondDim + 1, multimap<double, MyLabel*, greater<double>>());
+		vector<MyLabel*> dominatedOldLabs;	// record the dominated old labels
+		dominatedOldLabs.reserve(1e+6);
+		vector<int> nonDominatedLabsRec(g_firstDim);
 
-				double preWeight = ite->second->sum_a + g_instance.a_ptr[currItem] +
-					g_instance.rho * sqrt(ite->second->sum_b + g_instance.b_ptr[currItem]);
-				if (preWeight <= g_instance.capacity + EX) {//judge capacity
-					//label extension
-					MyLabel* tmpLab = new MyLabel(ite->second);
-					LabelExtention(g_instance, ite->second, tmpLab, currItem);
-					++g_tolGeneratedLabel;
+		MyLabel* initLab = new MyLabel();
+		oldExtended->begin()->insert({ 0, initLab });
+		++g_tolGeneratedLabel;
 
-					//completion bound to fathom label
-					if (CompletionBound(tmpLab, currItem + 1, &ub_matr)) {
-						++g_CBFathomLabel;
-						delete tmpLab; tmpLab = nullptr;
-						//before insert the old label, do the dominance check
-						MyLabel* oldLab = ite->second;
-						ite = (*oldExtended)[sndBktIdx].erase(ite);
-						if (keepOld) {
-							bool dominanceFlag = DominanceLogic(sndBktIdx, newExtended, oldExtended, oldLab, false);
-							if (dominanceFlag) {
-								/*delete oldLab;
-								oldLab = nullptr;*/
-								dominatedOldLabs.push_back(oldLab);
-								continue;
+		// label extention and dominance
+		int currItem = 0;				// record the current item to extend
+		bool timeLimitFlag = false;
+		for (int stage = 0; stage < g_firstDim; ++stage) {
+			thisNonDominatedLabel = 0;
+			for (int sndBktIdx = 0; sndBktIdx <= secondDim; ++sndBktIdx) {
+				if ((*oldExtended)[sndBktIdx].empty()) continue;
+				auto ite = (*oldExtended)[sndBktIdx].begin();
+				while (ite != (*oldExtended)[sndBktIdx].end()) {
+					//check the if the old label can be discarded by CB
+					bool keepOld = true;
+					if (CompletionBound(ite->second, currItem + 1, &ub_matr)) {
+						dominatedOldLabs.push_back(ite->second);
+						keepOld = false;
+					}
+					else {
+						++g_tolGeneratedLabel;
+					}
+
+					double preWeight = ite->second->sum_a + g_instance.a_ptr[currItem] +
+						g_instance.rho * sqrt(ite->second->sum_b + g_instance.b_ptr[currItem]);
+					if (preWeight <= g_instance.capacity + EX) {// judge capacity
+						// label extension
+						MyLabel* tmpLab = new MyLabel(ite->second);
+						LabelExtention(g_instance, ite->second, tmpLab, currItem);
+						++g_tolGeneratedLabel;
+
+						// completion bound to fathom label
+						if (CompletionBound(tmpLab, currItem + 1, &ub_matr)) {
+							++g_CBFathomLabel;
+							delete tmpLab; tmpLab = nullptr;
+							// before insert the old label, do the dominance check
+							MyLabel* oldLab = ite->second;
+							ite = (*oldExtended)[sndBktIdx].erase(ite);
+							if (keepOld) {
+								bool dominanceFlag = DominanceLogic(sndBktIdx, newExtended, oldExtended, oldLab, false);
+								if (dominanceFlag) {
+									/*delete oldLab;
+									oldLab = nullptr;*/
+									dominatedOldLabs.push_back(oldLab);
+									continue;
+								}
+
+								(*newExtended)[sndBktIdx].insert({ oldLab->tolProfit, oldLab });
 							}
+							continue;
+						}
 
+						// dominance check
+						int preSecondIdx = g_weight_to_secondIdx[(size_t)ceil(preWeight)];
+						bool dominanceFlag = DominanceLogic(preSecondIdx, newExtended, oldExtended, tmpLab);
+
+						if (dominanceFlag) {
+							delete tmpLab;
+							++g_dominatedLabel;
+						}
+						else {
+							// dominate other labels
+							JgeDominance((*newExtended), (*oldExtended), tmpLab, dominatedOldLabs);
+							// add the non dominated label into the new extended bucket
+							(*newExtended)[preSecondIdx].insert({ tmpLab->tolProfit, tmpLab });
+						}
+					}
+
+					// before insert the old label, do the dominance check
+					MyLabel* oldLab = ite->second;
+					ite = (*oldExtended)[sndBktIdx].erase(ite);
+					if (keepOld) {
+						bool dominanceFlag = DominanceLogic(sndBktIdx, newExtended, oldExtended, oldLab, false);
+						if (dominanceFlag) {
+							/*delete oldLab;
+							oldLab = nullptr;*/
+							dominatedOldLabs.push_back(oldLab);
+						}
+						else {
+							// save the current label to the new extended bucket
 							(*newExtended)[sndBktIdx].insert({ oldLab->tolProfit, oldLab });
 						}
-						continue;
-					}
-
-					//dominance check
-					int preSecondIdx = g_weight_to_secondIdx[(size_t)ceil(preWeight)];
-					bool dominanceFlag = DominanceLogic(preSecondIdx, newExtended, oldExtended, tmpLab);
-
-					if (dominanceFlag) {
-						delete tmpLab;
-						++g_dominatedLabel;
-					}
-					else {
-						//dominate other labels
-						JgeDominance((*newExtended), (*oldExtended), tmpLab, dominatedOldLabs);
-						//add the non dominated label into the new extended bucket
-						(*newExtended)[preSecondIdx].insert({ tmpLab->tolProfit, tmpLab });
 					}
 				}
-
-				//before insert the old label, do the dominance check
-				MyLabel* oldLab = ite->second;
-				ite = (*oldExtended)[sndBktIdx].erase(ite);
-				if (keepOld) {
-					bool dominanceFlag = DominanceLogic(sndBktIdx, newExtended, oldExtended, oldLab, false);
-					if (dominanceFlag) {
-						/*delete oldLab;
-						oldLab = nullptr;*/
-						dominatedOldLabs.push_back(oldLab);
-					}
-					else {
-						//save the current label to the new extended bucket
-						(*newExtended)[sndBktIdx].insert({ oldLab->tolProfit, oldLab });
+				thisNonDominatedLabel += (*newExtended)[sndBktIdx].size();
+				// use the present best dual variable to update
+				if (!(*newExtended)[sndBktIdx].empty()) {
+					if ((*newExtended)[sndBktIdx].begin()->first > g_bestLB) {
+						KnapsackSol preSol;
+						preSol.bestLab = new MyLabel((*newExtended)[sndBktIdx].begin()->second);
+						// get the item set
+						if (preSol.bestLab->itemSet.empty())
+							preSol.bestLab->itemSet.resize(g_instance.n_items + removedIndicesRec.size());
+						auto tmpLab = preSol.bestLab;
+						actual_sum_a = 0.0;
+						actual_sum_b = 0.0;
+						while (tmpLab->parentLab != nullptr) {
+							actual_sum_a += g_instance.a_ptr[tmpLab->lastItem];
+							actual_sum_b += g_instance.b_ptr[tmpLab->lastItem];
+							preSol.bestLab->itemSet[indicesRec[tmpLab->lastItem].index] = 1;
+							tmpLab = tmpLab->parentLab;
+						}
+						if (actual_sum_a + g_instance.rho*sqrt(actual_sum_b) <= g_instance.capacity + EX) {
+							finalSols.insert({ (*newExtended)[sndBktIdx].begin()->first, preSol });
+							g_bestLB = max(g_bestLB, (*newExtended)[sndBktIdx].begin()->first);
+						}
 					}
 				}
 			}
-			thisNonDominatedLabel += (*newExtended)[sndBktIdx].size();
-			//use the present best dual variable to update
-			if (!(*newExtended)[sndBktIdx].empty()) {
-				if ((*newExtended)[sndBktIdx].begin()->first > g_bestLB) {
-					KnapsackSol preSol;
-					preSol.bestLab = new MyLabel((*newExtended)[sndBktIdx].begin()->second);
-					//get the item set
-					if (preSol.bestLab->itemSet.empty())
-						preSol.bestLab->itemSet.resize(g_instance.n_items + removedIndicesRec.size());
-					auto tmpLab = preSol.bestLab;
-					while (tmpLab->parentLab != nullptr) {
-						preSol.bestLab->itemSet[indicesRec[tmpLab->lastItem].index] = 1;
-						tmpLab = tmpLab->parentLab;
-					}
-					finalSols.insert({ (*newExtended)[sndBktIdx].begin()->first, preSol });
-					g_bestLB = max(g_bestLB, (*newExtended)[sndBktIdx].begin()->first);
+			auto endTime = chrono::high_resolution_clock::now();
+			if (chrono::duration_cast<chrono::milliseconds>(endTime - startTime).count() / 1000.0 >= MAXSOLTIME) {
+				cout << "The maximum solution time of my DP is reached!" << endl;
+				outPut << "The maximum solution time of my DP is reached!" << endl;
+				timeLimitFlag = true;
+			}
+			if (timeLimitFlag) {
+				auto ite = (*oldExtended).begin();
+				for (auto& e : (*newExtended)) {
+					for (auto& t : e)
+						ite->insert({ t.first, t.second });
+					++ite;
 				}
+				break;
+			}
+			++currItem;
+			delete oldExtended;
+			oldExtended = newExtended;
+			newExtended = new vector<multimap<double, MyLabel*, greater<double>>>(secondDim + 1, multimap<double, MyLabel*, greater<double>>());
+			nonDominatedLabsRec[stage] = thisNonDominatedLabel;
+
+			if (g_instance.equal_p_a && std::abs(g_bestLB - g_instance.capacity) < EX) {
+				cout << "Optimal solution found at stage " << stage << endl;
+				outPut << "Optimal solution found at stage " << stage << endl;
+				break;
 			}
 		}
-		auto endTime = chrono::high_resolution_clock::now();
-		if (chrono::duration_cast<chrono::milliseconds>(endTime - startTime).count() / 1000.0 >= MAXMUMSOLTIME) {
-			cout << "The maximum solution time of my DP is reached!" << endl;
-			outPut << "The maximum solution time of my DP is reached!" << endl;
-			timeLimitFlag = true;
-		}
-		if (timeLimitFlag) {
-			auto ite = (*oldExtended).begin();
-			for (auto& e : (*newExtended)) {
-				for (auto& t : e)
-					ite->insert({ t.first, t.second });
-				++ite;
+		// record the best solution org record for ELA
+		auto ite = --(*oldExtended).end();
+		MyLabel* bestLab = nullptr;
+		while (true) {
+			if (!ite->empty()) {
+				bestLab = ite->begin()->second;
+				ite->erase(ite->begin());
+				break;
 			}
-			break;
+			if (ite == (*oldExtended).begin())
+				break;
+			--ite;
 		}
-		++currItem;
+		string bestItemSet = finalSols.begin()->second.bestItemSet;
+		if (bestLab != nullptr) {
+			// get the item set
+			vector<int> bestIS;
+			MyLabel* tmpLab = bestLab;
+			while (tmpLab->parentLab != nullptr) {
+				bestIS.push_back(indicesRec[tmpLab->lastItem].index);
+				tmpLab = tmpLab->parentLab;
+			}
+			sort(bestIS.begin(), bestIS.end());
+			bestItemSet = JoinVector(bestIS);
+			// store the best solution
+			KnapsackSol bestSol;
+			bestSol.bestItemSet = bestItemSet;
+			bestSol.bestLab = bestLab;
+			finalSols.insert({ bestLab->tolProfit, bestSol });
+			g_bestLB = max(g_bestLB, finalSols.begin()->first);
+		}
+		if (bestItemSet.empty()) {
+			for (int i = 0; i < finalSols.begin()->second.bestLab->itemSet.size(); ++i)
+				if (finalSols.begin()->second.bestLab->itemSet[i])
+					bestItemSet += to_string(i) + ",";
+		}
+		// free space
+		for (auto& e : finalSols)
+			delete e.second.bestLab;
+		for (auto& t : (*oldExtended)) {
+			for (auto& e : t)
+				delete e.second;
+		}
 		delete oldExtended;
-		oldExtended = newExtended;
-		newExtended = new vector<multimap<double, MyLabel*, greater<double>>>(secondDim + 1, multimap<double, MyLabel*, greater<double>>());
-		nonDominatedLabsRec[stage] = thisNonDominatedLabel;
-	}
-	//record the best solution org record for ELA
-	auto ite = --(*oldExtended).end();
-	MyLabel* bestLab = nullptr;
-	while (true) {
-		if (!ite->empty()) {
-			bestLab = ite->begin()->second;
-			ite->erase(ite->begin());
-			break;
-		}
-		if (ite == (*oldExtended).begin())
-			break;
-		--ite;
-	}
-	string bestItemSet = finalSols.begin()->second.bestItemSet;
-	if (bestLab != nullptr) {
-		//get the item set
-		vector<int> bestIS;
-		MyLabel* tmpLab = bestLab;
-		while (tmpLab->parentLab != nullptr) {
-			bestIS.push_back(indicesRec[tmpLab->lastItem].index);
-			tmpLab = tmpLab->parentLab;
-		}
-		sort(bestIS.begin(), bestIS.end());
-		bestItemSet = JoinVector(bestIS);
-		//store the best solution
-		KnapsackSol bestSol;
-		bestSol.bestItemSet = bestItemSet;
-		bestSol.bestLab = bestLab;
-		finalSols.insert({ bestLab->tolProfit, bestSol });
-		g_bestLB = max(g_bestLB, finalSols.begin()->first);
-	}
-	if (bestItemSet.empty()) {
-		for (int i = 0; i < finalSols.begin()->second.bestLab->itemSet.size(); ++i)
-			if (finalSols.begin()->second.bestLab->itemSet[i])
-				bestItemSet += to_string(i) + ",";
+		delete newExtended;
+		g_dominatedLabel += dominatedOldLabs.size();
+		for (auto& lab : dominatedOldLabs)
+			delete lab;
 	}
 
-	//free space
-	for (auto& e : finalSols)
-		delete e.second.bestLab;
-	for (auto& t : (*oldExtended)) {
-		for (auto& e : t)
-			delete e.second;
+	auto exactDP_endTime = chrono::high_resolution_clock::now();
+	auto endTime = chrono::high_resolution_clock::now();
+	double myLabelTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime).count() / 1000.0;
+	cout << "The best solution obtained by my labelsetting algorithm is: " << g_bestLB << endl;
+	cout << "The solution obtained by TS heuristic is: " << ts_sol << endl;
+	cout << "The solution obtained by heuristic labeling algorithm is: " << HLA_sol << endl;
+	cout << "The time for my labelsetting algorithm is: " << myLabelTime << "s" << endl;
+	cout << "The time for heuristic primal solution is: " << chrono::duration_cast<chrono::milliseconds>(heuPrimal_endTime - heuPrimal_startTime).count() / 1000.0 << "s" << endl;
+	if (!HLA_optimal) {
+		cout << "The time for linear relaxation (dual bound) is: " << chrono::duration_cast<chrono::milliseconds>(LR_endTime - LR_startTime).count() / 1000.0 << "s" << endl;
+		cout << "The time for heuristic DP is: " << heuLabelTime << "s" << endl;
+		cout << "The time for exact dual bound is: " << dualBoundTime << "s" << endl;
+		cout << "The time for final exact DP is: " << chrono::duration_cast<chrono::milliseconds>(exactDP_endTime - exactDP_startTime).count() / 1000.0 << "s" << endl;
+		cout << "The total number of generated labels is: " << g_tolGeneratedLabel << endl;
+		cout << "The number of non-dominated labels is: " << g_nonDominatedLabel + thisNonDominatedLabel << endl;
+		cout << "The number of CB fathomed labels is: " << g_CBFathomLabel << endl;
+		cout << "The number of dominated labels is: " << g_dominatedLabel << endl;
+		cout << "The best item set is: " << bestItemSet << endl;
 	}
-	delete oldExtended;
-	delete newExtended;
-	g_dominatedLabel += dominatedOldLabs.size();
-	for (auto& lab : dominatedOldLabs)
-		delete lab;
+
+	outPut << "\n\n****The result of my labelsetting algorithm****" << g_bestLB << endl;
+	outPut << "The best solution obtained by my labelsetting algorithm is: " << g_bestLB << endl;
+	outPut << "The solution obtained by TS heuristic is: " << ts_sol << endl;
+	outPut << "The solution obtained by heuristic labeling algorithm is: " << HLA_sol << endl;
+	outPut << "The time for my labelsetting algorithm is: " << myLabelTime << "s" << endl;
+	outPut << "The time for heuristic primal solution is: " << chrono::duration_cast<chrono::milliseconds>(heuPrimal_endTime - heuPrimal_startTime).count() / 1000.0 << "s" << endl;
+	if (!HLA_optimal) {
+		outPut << "The time for linear relaxation (dual bound) is: " << chrono::duration_cast<chrono::milliseconds>(LR_endTime - LR_startTime).count() / 1000.0 << "s" << endl;
+		outPut << "The time for heuristic DP is: " << heuLabelTime << "s" << endl;
+		outPut << "The time for exact dual bound is: " << dualBoundTime << "s" << endl;
+		outPut << "The time for final exact DP is: " << chrono::duration_cast<chrono::milliseconds>(exactDP_endTime - exactDP_startTime).count() / 1000.0 << "s" << endl;
+		outPut << "The total number of generated labels is: " << g_tolGeneratedLabel << endl;
+		outPut << "The best item set is: " << bestItemSet << endl;
+		outPut << "The number of non-dominated labels is: " << g_nonDominatedLabel + thisNonDominatedLabel << endl;
+		outPut << "The number of CB fathomed labels is: " << g_CBFathomLabel << endl;
+		outPut << "The number of dominated labels is: " << g_dominatedLabel << endl;
+	}
+	cout << endl;
+	outPut << endl;
+	outPut.close();
 
 	free(indicesRec);
 	free(g_instance.a_ptr);
@@ -1072,49 +1114,6 @@ int LabelSettingSolveKnapsack(Args& args) {
 	free(g_instance.p_weight);
 	g_instance.a_ptr = g_instance.b_ptr = g_instance.p_ptr = g_instance.p_weight = nullptr;
 	dm_free(&ub_matr);
-
-	auto exactDP_endTime = chrono::high_resolution_clock::now();
-	auto endTime = chrono::high_resolution_clock::now();
-	double myLableTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime).count() / 1000.0;
-	cout << "The best solution obtained by my labelsetting algorithm is: " << g_bestLB << endl;
-	cout << "The solution obtained by TS heuristic is: " << ts_sol << endl;
-	cout << "The solution obtained by heuristic labeling algorithm is: " << HLA_sol << endl;
-	cout << "The time for my labelsetting algorithm is: " << myLableTime << "s" << endl;
-	cout << "The time for heuristic primal solution is: " << chrono::duration_cast<chrono::milliseconds>(heuPrimal_endTime - heuPrimal_startTime).count() / 1000.0 << "s" << endl;
-	cout << "The time for linear relaxation (dual bound) is: " << chrono::duration_cast<chrono::milliseconds>(LR_endTime - LR_startTime).count() / 1000.0 << "s" << endl;
-	cout << "The time for heuristic DP is: " << heuLableTime << "s" << endl;
-	cout << "The time for exact dual bound is: " << dualBoundTime << "s" << endl;
-	cout << "The time for final exact DP is: " << chrono::duration_cast<chrono::milliseconds>(exactDP_endTime - exactDP_startTime).count() / 1000.0 << "s" << endl;
-	cout << "The total number of generated labels is: " << g_tolGeneratedLabel << endl;
-	cout << "The number of non-dominated labels is: " << g_nonDominatedLabel + thisNonDominatedLabel << endl;
-	cout << "The number of CB fathomed labels is: " << g_CBFathomLabel << endl;
-	cout << "The number of dominated labels is: " << g_dominatedLabel << endl;
-	cout << "The best item set is: " << bestItemSet << endl;
-	//cout << "The trend of non dominated labels: " << endl;
-
-	outPut << "\n\n****The resulte of my labelsetting algorithm****" << g_bestLB << endl;
-	outPut << "The best solution obtained by my labelsetting algorithm is: " << g_bestLB << endl;
-	outPut << "The solution obtained by TS heuristic is: " << ts_sol << endl;
-	outPut << "The solution obtained by heuristic labeling algorithm is: " << HLA_sol << endl;
-	outPut << "The time for my labelsetting algorithm is: " << myLableTime << "s" << endl;
-	outPut << "The time for heuristic primal solution is: " << chrono::duration_cast<chrono::milliseconds>(heuPrimal_endTime - heuPrimal_startTime).count() / 1000.0 << "s" << endl;
-	outPut << "The time for linear relaxation (dual bound) is: " << chrono::duration_cast<chrono::milliseconds>(LR_endTime - LR_startTime).count() / 1000.0 << "s" << endl;
-	outPut << "The time for heuristic DP is: " << heuLableTime << "s" << endl;
-	outPut << "The time for exact dual bound is: " << dualBoundTime << "s" << endl;
-	outPut << "The time for final exact DP is: " << chrono::duration_cast<chrono::milliseconds>(exactDP_endTime - exactDP_startTime).count() / 1000.0 << "s" << endl;
-	outPut << "The total number of generated labels is: " << g_tolGeneratedLabel << endl;
-	outPut << "The best item set is: " << bestItemSet << endl;
-	outPut << "The number of non-dominated labels is: " << g_nonDominatedLabel + thisNonDominatedLabel << endl;
-	outPut << "The number of CB fathomed labels is: " << g_CBFathomLabel << endl;
-	outPut << "The number of dominated labels is: " << g_dominatedLabel << endl;
-	//outPut << "The trend of non dominated labels: " << endl;
-	//for (auto& e : nonDominatedLabsRec) {
-	//	cout << e << "\t";
-	//	outPut << e << "\t";
-	//}
-	cout << endl;
-	outPut << endl;
-	outPut.close();
 
 	return g_bestLB;
 }
