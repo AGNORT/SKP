@@ -29,7 +29,7 @@ link_directories($ENV{GUROBI_HOME}/lib)
 set(SOURCE_DIR ${CMAKE_SOURCE_DIR}/src)
 
 # Add the executable
-add_executable(SKP 
+add_executable(SKP-S 
     ${SOURCE_DIR}/macros.h
     ${SOURCE_DIR}/ts_config.h
     ${SOURCE_DIR}/item.h ${SOURCE_DIR}/item.c
@@ -42,10 +42,10 @@ add_executable(SKP
     
     ${SOURCE_DIR}/main.cpp)
 # Add the Gurobi library
-target_link_libraries(SKP PRIVATE gurobi_c++ gurobi120 pthread) #Specify you own Gurobi version number
+target_link_libraries(SKP-S PRIVATE gurobi_c++ gurobi130 pthread) #Specify you own Gurobi version number
 
 # Set the output directories for object files and the executable
-set_target_properties(SKP PROPERTIES
+set_target_properties(SKP-S PROPERTIES
     ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
@@ -58,4 +58,4 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer")
 # target_compile_options(knapsack PRIVATE -Wall -Wextra -Wpedantic -g -ggdb -O0)
-target_compile_options(SKP PRIVATE -w -Wextra -Wpedantic -O3 -g -ggdb)
+target_compile_options(SKP-S PRIVATE -w -Wextra -Wpedantic -O3 -g -ggdb)
