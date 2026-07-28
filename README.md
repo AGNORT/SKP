@@ -1,10 +1,10 @@
 [![INFORMS Journal on Computing Logo](https://INFORMSJoC.github.io/logos/INFORMS_Journal_on_Computing_Header.jpg)](https://pubsonline.informs.org/journal/ijoc)
 
-# A DP-based Exact Method for the Submodular Knapsack Problem with a Square-Root Capacity Constraint
+# A DP-based Exact Method for the Submodular Knapsack with a Square-Root Capacity Constraint
 
 This repository accompanies the paper submitted to the [INFORMS Journal on Computing (IJOC)](https://pubsonline.informs.org/journal/ijoc). All source code is released under the [MIT License](LICENSE).
 
-The software and data in this repository are a snapshot of the software and data that were used in the research reported on the paper “A DP-based Exact Method for the Submodular Knapsack Problem with a Square-Root Capacity Constraint” (*DOI link to add*) by Feilong Wang, Renata Mansini, Alice Raffaele, Filippo Ranza, and Roberto Roberti.
+The software and data in this repository are a snapshot of the software and data that were used in the research reported on the paper “A DP-based Exact Method for the Submodular Knapsack with a Square-Root Capacity Constraint” (*DOI link to add*) by Feilong Wang, Renata Mansini, Alice Raffaele, Filippo Ranza, and Roberto Roberti.
 
 ## Cite
 
@@ -23,12 +23,12 @@ This repository provides the implementation of our algorithms to reproduce the c
 
 ## Requirements
 
-The algorithms are compiled and executed on a machine Intel(R) Xeon(R) CPU E3-1220 V2 @ 3.10GHz, 14GB of RAM, running Fedora Linux 37 environment, with **GCC 14.2**, **CMake 3.26**, and **Gurobi 12.0.1**. Please ensure that the following dependencies are installed before compilation:
+The algorithms are compiled and executed on a machine Intel(R) Xeon(R) CPU E3-1220 V2 @ 3.10GHz, 14GB of RAM, running Fedora Linux 37 environment, with **GCC 14.2**, **CMake 3.26**, and **Gurobi 13.0.1**. Please ensure that the following dependencies are installed before compilation:
 
 ```bash
 GCC     # version 14.2 or higher
 CMake   # version 3.26 or higher
-Gurobi  # version 12.0 or higher
+Gurobi  # version 13.0.1 or higher
 ```
 
 ## Building
@@ -50,13 +50,13 @@ cmake ..
 make
 ```
 
-This will generate the executable `SKP` in the `build` directory. Since we use Gurobi as the commercial solver, users need to change the path related to the Gurobi solver in the CMakeLists.txt.
+This will generate the executable `SKP-S` in the `build` directory. Since we use Gurobi as the commercial solver, users need to change the path related to the Gurobi solver in the CMakeLists.txt.
 
 ```makefile
 # Set Gurobi paths (modify according to your installation)
 set(GUROBI_HOME /path/to/your/gurobi/library)
 set(GRB_LICENSE_FILE /path/to/your/gurobi/license)
-target_link_libraries(SKP PRIVATE gurobi_c++ gurobi120 pthread) # Replace gurobi120 with your installed version (e.g., gurobi110 version)
+target_link_libraries(SKP-S PRIVATE gurobi_c++ gurobi120 pthread) # Replace gurobi120 with your installed version (e.g., gurobi110 version)
 ```
 
 ## Data and Replication
@@ -66,7 +66,7 @@ target_link_libraries(SKP PRIVATE gurobi_c++ gurobi120 pthread) # Replace gurobi
 ```makefile
 -i   <file>   # input .txt file (mandatory)
 -o   <file>   # output .txt file (mandatory)
--m   <Gurobi>   # solution method (optional, default: DP for SKP)
+-m   <Gurobi>   # solution method (optional, default: DP for SKP-S)
 ```
 
 All instances are available in the `data` folder .
@@ -74,26 +74,26 @@ All detailed results are provided in an Excel file in the `results` folder, wher
 
 ## Example Commands
 
-Solve SKP:
+Solve SKP-S:
 
 ```bash
 cd build
-./SKP -i path/to/input.txt -o path/to/output.txt
+./SKP-S -i path/to/input.txt -o path/to/output.txt
 ```
 
-Solve SKP with Gurobi:
+Solve SKP-S with Gurobi:
 
 ```bash
 cd build
-./SKP -i path/to/the/input/file -o path/to/the/output/file -m Gurobi
+./SKP-S -i path/to/the/input/file -o path/to/the/output/file -m Gurobi
 ```
 
 ## Example Outputs
 
-**SKP with DP**
+**SKP-S with DP**
 
 ```
-Solve SKP use DP!
+Solve SKP-S use DP!
 
 heuristic labeling get lower bound: 22256
 heuristic labeling use time: 0.65s
@@ -111,10 +111,10 @@ The number of non-dominated labels is: 4
 The number of CB fathomed labels is: 1254
 The number of dominated labels is: 15488946
 ```
-**SKP with Gurobi**
+**SKP-S with Gurobi**
 
 ```
-Solve SKP use Gurobi!
+Solve SKP-S use Gurobi!
 Optimal solution found (tolerance 1.00e-06)
 Best objective 2.225600000000e+04, best bound 2.225600000000e+04, gap 0.0000%
 ***************The results obtained by Gurobi**************
