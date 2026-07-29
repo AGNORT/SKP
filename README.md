@@ -1,10 +1,10 @@
 [![INFORMS Journal on Computing Logo](https://INFORMSJoC.github.io/logos/INFORMS_Journal_on_Computing_Header.jpg)](https://pubsonline.informs.org/journal/ijoc)
 
-# A DP-based Exact Method for the Submodular Knapsack with a Square-Root Capacity Constraint
+# A DP-based Exact Method for the Submodular Knapsack with Square-Root Capacity Constraint
 
 This repository accompanies the paper submitted to the [INFORMS Journal on Computing (IJOC)](https://pubsonline.informs.org/journal/ijoc). All source code is released under the [MIT License](LICENSE).
 
-The software and data in this repository are a snapshot of the software and data that were used in the research reported on the paper “A DP-based Exact Method for the Submodular Knapsack with a Square-Root Capacity Constraint” (*DOI link to add*) by Feilong Wang, Renata Mansini, Alice Raffaele, Filippo Ranza, and Roberto Roberti.
+The software and data in this repository are a snapshot of the software and data that were used in the research reported on the paper “A DP-based Exact Method for the Submodular Knapsack with Square-Root Capacity Constraint” (*DOI link to add*) by Feilong Wang, Renata Mansini, Alice Raffaele, Filippo Ranza, and Roberto Roberti.
 
 ## Cite
 
