@@ -14,12 +14,12 @@ int main(int argc, char** argv) {
 	/**********Solve SKP-S*******/
 	cout << "Solve SKP-S using ";
 	if (strcmp(args.method, "DP") == 0) {
-		cout << "DP!" << endl;
+		cout << "DP" << endl;
 		// Call DP exact method to solve the SKP-S
 		LabelSettingSolveKnapsack(args);
 	}
 	else{
-		cout << "Gurobi!" << endl;
+		cout << "Gurobi" << endl;
 		// Call the Gurobi solver to solve the compact SOCP model of the SKP-S
 		SolveCompactKnapsackModel(args);
 	}

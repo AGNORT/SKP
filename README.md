@@ -56,7 +56,7 @@ This will generate the executable `SKP-S` in the `build` directory. Since we use
 # Set Gurobi paths (modify according to your installation)
 set(GUROBI_HOME /path/to/your/gurobi/library)
 set(GRB_LICENSE_FILE /path/to/your/gurobi/license)
-target_link_libraries(SKP-S PRIVATE gurobi_c++ gurobi120 pthread) # Replace gurobi120 with your installed version (e.g., gurobi110 version)
+target_link_libraries(SKP-S PRIVATE gurobi_c++ gurobi130 pthread) # Replace gurobi130 with your installed version (e.g., gurobi120 version)
 ```
 
 ## Data and Replication
@@ -93,7 +93,7 @@ cd build
 **SKP-S with DP**
 
 ```
-Solve SKP-S use DP!
+Solve SKP-S use DP
 
 heuristic labeling get lower bound: 22256
 heuristic labeling use time: 0.65s
@@ -114,7 +114,7 @@ The number of dominated labels is: 15488946
 **SKP-S with Gurobi**
 
 ```
-Solve SKP-S use Gurobi!
+Solve SKP-S use Gurobi
 Optimal solution found (tolerance 1.00e-06)
 Best objective 2.225600000000e+04, best bound 2.225600000000e+04, gap 0.0000%
 ***************The results obtained by Gurobi**************
