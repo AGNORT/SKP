@@ -3,12 +3,12 @@
 
 using namespace std;
 
-int g_gurobi_setting = 4; // 1;         // Linearized, outer Approximation + Dual Simplex: MIQCPMethod = 1, Method = 1;
-                            //2;        // Linearized, outer Approximation + Primal Simplex: MIQCPMethod = 1, Method = 0;
-                            //3;        // Conic + Barrier: MIQCPMethod = 0, Method = 2;
-                            //4;        // Gurobi default settings without specifying anything.
+int g_gurobi_setting = 4;   // 1;        // Linearized, outer Approximation + Dual Simplex: MIQCPMethod = 1, Method = 1;
+                            // 2;        // Linearized, outer Approximation + Primal Simplex: MIQCPMethod = 1, Method = 0;
+                            // 3;        // Conic + Barrier: MIQCPMethod = 0, Method = 2;
+                            // 4;        // Gurobi default settings without specifying anything.
 
-// Call the GuRoBi solver to solve the compact SOCP model of the SKP
+// Call the GuRoBi solver to solve the compact SOCP model of the SKP-S
 void SolveCompactKnapsackModel(Args& args) {
     // Read instance
     Instance instance = { 0 };

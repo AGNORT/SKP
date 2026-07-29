@@ -53,7 +53,6 @@ int parse_header(Instance* RESTRICT inst, const Triple* RESTRICT triple) {
     alloc_vect(inst->p_weight);
 
     inst->equal_p_a = true;
-    inst->ratio_sigma_a_const = true;
 
     return SUCCESS;
 }
@@ -91,19 +90,8 @@ int check_equal_p_a(Instance* RESTRICT inst) {
     return SUCCESS;
 }
 
-int check_ratio_sigma_a_const(Instance* RESTRICT inst) {
-    double ratio = sqrt(inst->b_ptr[0])/inst->a_ptr[0];
-    for (int i=1; i < inst->n_items; i++) {
-        if (fabs((sqrt(inst->b_ptr[i])/inst->a_ptr[i]) - ratio) > EX) {
-            inst->ratio_sigma_a_const = false;
-            break;
-        }
-    }
-    return SUCCESS;
-}
-
 int instance_parse(Instance* RESTRICT inst, const char* const RESTRICT file_path) {
-    FILE* file = fopen(file_path, "r");  // ����ͨ�ı��ļ�
+    FILE* file = fopen(file_path, "r");
     if (file == NULL)
         return FAILURE;
 
@@ -130,10 +118,7 @@ int instance_parse(Instance* RESTRICT inst, const char* const RESTRICT file_path
     inst->n_items = inst->n_items_eff;
 
     run_or_fail(check_equal_p_a(inst));
-    run_or_fail(check_ratio_sigma_a_const(inst));
-
-    printf("Check p_i = a_i for each i: %d\n", inst->equal_p_a);
-    printf("Check sigma_i/a_i const for each i: %d\n", inst->ratio_sigma_a_const);
+    printf("Check if SS instances (p_i = a_i for each i): %d\n", inst->equal_p_a);
 
     free(line);
     fclose(file);

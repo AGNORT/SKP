@@ -12,7 +12,7 @@ int g_tolItemNum = 0;							// the total number of items
 int g_firstDim = 0;								// the first dimension of the bucket
 int secondDim = 0;								// the second dimension of the bucket
 double g_bestLB = 0;							// the best lower bound		
-int g_secondDimDiv = 4;							// the divisor for second dimension of the bucket
+int g_secondDimDiv = 1;							// the divisor for second dimension of the bucket
 double g_smallest_bDiva = 1e10;					// the smallest ratio of a/b for the present instance	
 
 vector<double> g_profitRec;						// the profit record from each item
@@ -20,7 +20,7 @@ vector<double> g_profitRec;						// the profit record from each item
 /*bucket index*/
 std::vector<int> g_item_to_firstIdx;			// map item to item bucket index
 std::vector<int> g_weight_to_secondIdx;			// map weight to capacity bucket index
-int g_domWidth = 3;								// the width of buckets dominance check in [0, 1, 3, 6, 10, 15, 20, INT_MAX]
+int g_domWidth = 10;								// the width of buckets dominance check in [0, 1, 3, 6, 10, 15, 20, INT_MAX]
 bool g_pInteger = true;							// remark if parameter p is integer 
 bool g_aInteger = true;							// remark if parameter a is integer 
 
@@ -36,7 +36,7 @@ bool g_use_strong_dom_rules = true;				// if the strong dominance rules are used
 bool g_use_CB = true;							// if the completion bound is used
 bool g_use_TS = true;							// if the TS is used
 bool g_use_HLA = true;							// if the HLA is used
-int g_labeling_stgy = 3;						// 1; default setting one, strong dom + CB + TS + HLA
+int g_labeling_stgy = 1;						// 1; default setting one, strong dom + CB + TS + HLA
 												// 2; setting two: strong dom without {CB + TS + HLA}
 												// 3; setting three: strong dom + CB + TS
 												// 4; setting four: strong dom + CB + HLA
@@ -414,7 +414,7 @@ bool DominanceLogic(
 	vector<multimap<double, MyLabel*, greater<double>>>*& newExtended,
 	vector<multimap<double, MyLabel*, greater<double>>>*& oldExtended,
 	MyLabel* preLab,
-	bool newLabelFalg = true,
+	bool newLabelFlag = true,
 	bool heuDom = false) {
 	bool dominanceFlag = false;
 	int j = preSecondIdx;
@@ -444,7 +444,7 @@ bool DominanceLogic(
 		if (dominanceFlag) break;
 
 		// Old labels don't need to be checked with old labels, since this was checked during the generation of the new label
-		if (newLabelFalg) {
+		if (newLabelFlag) {
 			auto& preBkt = (*oldExtended)[j];
 			auto domIite = preBkt.begin();
 			int cnt = 0;
@@ -472,7 +472,6 @@ bool DominanceLogic(
 		--j;
 		if (preSecondIdx - j > g_domWidth) break;
 	}
-
 	return dominanceFlag;
 }
 
@@ -615,7 +614,6 @@ void LabelSettingHeuristic(
 		newExtended = new vector<multimap<double, MyLabel*, greater<double>>>(secondDim + 1, multimap<double, MyLabel*, greater<double>>());
 		nonDominatedLabsRec[stage] = thisNonDominatedLabel;
 	}
-
 	// record the best solution for HLA
 	auto ite = --(*oldExtended).end();
 	MyLabel* bestLab = nullptr;
@@ -854,12 +852,12 @@ int LabelSettingSolveKnapsack(Args& args) {
 	for (int i = 0; i < g_instance.n_items; ++i)
 		preciseDuals[i] = g_instance.p_ptr[i];
 	double HLA_sol = 0.0;
-	if (g_use_HLA || g_instance.ratio_sigma_a_const) {
+	if (g_use_HLA) {
 		LabelSettingHeuristic(ub_matr, heuLabelTime, indicesRec, sr3Duals, sr3s, removedIndicesRec, finalSols);// mask HLA
-		cout << "heuristic labeling get lower bound: " << g_bestLB << endl;
-		cout << "heuristic labeling use time: " << heuLabelTime << "s" << endl;
+		cout << "HLA solution: " << g_bestLB << endl;
+		cout << "HLA time: " << heuLabelTime << "s" << endl;
 		HLA_sol = g_bestLB;
-		if (g_instance.ratio_sigma_a_const || (g_instance.equal_p_a && std::abs(g_bestLB - g_instance.capacity) < EX)) {
+		if (g_instance.equal_p_a && std::abs(g_bestLB - g_instance.capacity) < EX) {
 			cout << "Optimal solution found with HLA " << endl;
 			outPut << "Optimal solution found with HLA " << endl;
 			cout << "The best item set is " << finalSols.begin()->second.bestItemSet << endl;
@@ -872,7 +870,7 @@ int LabelSettingSolveKnapsack(Args& args) {
 	double actual_sum_a = 0.0;
 	double actual_sum_b = 0.0;
 	string bestItemSet;
-	if (!g_instance.ratio_sigma_a_const && !HLA_optimal) { // If ratio_sigma_a_const = true or if HLA has found a best solution, skip ELA
+	if (!HLA_optimal) { // If HLA has found a best solution, skip ELA
 		// initialize the bucket
 		vector<multimap<double, MyLabel*, greater<double>>>* oldExtended = new vector<multimap<double, MyLabel*, greater<double>>>(secondDim + 1, multimap<double, MyLabel*, greater<double>>());
 		vector<multimap<double, MyLabel*, greater<double>>>* newExtended = new vector<multimap<double, MyLabel*, greater<double>>>(secondDim + 1, multimap<double, MyLabel*, greater<double>>());
@@ -902,7 +900,6 @@ int LabelSettingSolveKnapsack(Args& args) {
 					else {
 						++g_tolGeneratedLabel;
 					}
-
 					double preWeight = ite->second->sum_a + g_instance.a_ptr[currItem] +
 						g_instance.rho * sqrt(ite->second->sum_b + g_instance.b_ptr[currItem]);
 					if (preWeight <= g_instance.capacity + EX) {// judge capacity
@@ -910,7 +907,6 @@ int LabelSettingSolveKnapsack(Args& args) {
 						MyLabel* tmpLab = new MyLabel(ite->second);
 						LabelExtention(g_instance, ite->second, tmpLab, currItem);
 						++g_tolGeneratedLabel;
-
 						// completion bound to fathom label
 						if (CompletionBound(tmpLab, currItem + 1, &ub_matr)) {
 							++g_CBFathomLabel;
@@ -1029,7 +1025,7 @@ int LabelSettingSolveKnapsack(Args& args) {
 				break;
 			--ite;
 		}
-		string bestItemSet = finalSols.begin()->second.bestItemSet;
+		bestItemSet = finalSols.begin()->second.bestItemSet;
 		if (bestLab != nullptr) {
 			// get the item set
 			vector<int> bestIS;
@@ -1071,12 +1067,12 @@ int LabelSettingSolveKnapsack(Args& args) {
 	double myLabelTime = chrono::duration_cast<chrono::milliseconds>(endTime - startTime).count() / 1000.0;
 	cout << "The best solution obtained by my labelsetting algorithm is: " << g_bestLB << endl;
 	cout << "The solution obtained by TS heuristic is: " << ts_sol << endl;
-	cout << "The solution obtained by heuristic labeling algorithm is: " << HLA_sol << endl;
+	cout << "The solution obtained by HLA is: " << HLA_sol << endl;
+	cout << "The time for TS heuristic is: " << chrono::duration_cast<chrono::milliseconds>(heuPrimal_endTime - heuPrimal_startTime).count() / 1000.0 << "s" << endl;
+	cout << "The time for HLA is: " << heuLabelTime << "s" << endl;
 	cout << "The time for my labelsetting algorithm is: " << myLabelTime << "s" << endl;
-	cout << "The time for heuristic primal solution is: " << chrono::duration_cast<chrono::milliseconds>(heuPrimal_endTime - heuPrimal_startTime).count() / 1000.0 << "s" << endl;
 	if (!HLA_optimal) {
 		cout << "The time for linear relaxation (dual bound) is: " << chrono::duration_cast<chrono::milliseconds>(LR_endTime - LR_startTime).count() / 1000.0 << "s" << endl;
-		cout << "The time for heuristic DP is: " << heuLabelTime << "s" << endl;
 		cout << "The time for exact dual bound is: " << dualBoundTime << "s" << endl;
 		cout << "The time for final exact DP is: " << chrono::duration_cast<chrono::milliseconds>(exactDP_endTime - exactDP_startTime).count() / 1000.0 << "s" << endl;
 		cout << "The total number of generated labels is: " << g_tolGeneratedLabel << endl;
@@ -1089,12 +1085,12 @@ int LabelSettingSolveKnapsack(Args& args) {
 	outPut << "\n\n****The result of my labelsetting algorithm****" << g_bestLB << endl;
 	outPut << "The best solution obtained by my labelsetting algorithm is: " << g_bestLB << endl;
 	outPut << "The solution obtained by TS heuristic is: " << ts_sol << endl;
-	outPut << "The solution obtained by heuristic labeling algorithm is: " << HLA_sol << endl;
+	outPut << "The solution obtained by HLA is: " << HLA_sol << endl;
+	outPut << "The time for TS heuristic is: " << chrono::duration_cast<chrono::milliseconds>(heuPrimal_endTime - heuPrimal_startTime).count() / 1000.0 << "s" << endl;
+	outPut << "The time for HLA is: " << heuLabelTime << "s" << endl;
 	outPut << "The time for my labelsetting algorithm is: " << myLabelTime << "s" << endl;
-	outPut << "The time for heuristic primal solution is: " << chrono::duration_cast<chrono::milliseconds>(heuPrimal_endTime - heuPrimal_startTime).count() / 1000.0 << "s" << endl;
 	if (!HLA_optimal) {
 		outPut << "The time for linear relaxation (dual bound) is: " << chrono::duration_cast<chrono::milliseconds>(LR_endTime - LR_startTime).count() / 1000.0 << "s" << endl;
-		outPut << "The time for heuristic DP is: " << heuLabelTime << "s" << endl;
 		outPut << "The time for exact dual bound is: " << dualBoundTime << "s" << endl;
 		outPut << "The time for final exact DP is: " << chrono::duration_cast<chrono::milliseconds>(exactDP_endTime - exactDP_startTime).count() / 1000.0 << "s" << endl;
 		outPut << "The total number of generated labels is: " << g_tolGeneratedLabel << endl;

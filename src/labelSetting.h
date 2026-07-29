@@ -133,21 +133,21 @@ public:
 };
 using Bin = MyLabel;		// rename MyLabel as Bin
 
-//the best kanpsack solution
+//the best knapsack solution
 class KnapsackSol {
 public:
 
 public:
-	MyLabel* bestLab;			//the best label
-	std::string bestItemSet;	    //the best item set
+	MyLabel* bestLab;				// the best label
+	std::string bestItemSet;	    // the best item set
 };
 
 
-/*function decleration*/
+/*function declaration*/
 //convert vector to string
 std::string JoinVector(const std::vector<int>& vec);
 
-// instance data������,�Ӵ�С����
+// instance data
 void sort_instance_by_p_ab(Instance& preInstances, ItemIndex*& indices);
 
 //design the labelsetting algorithm to solve the submodular knapsack problem
@@ -169,7 +169,7 @@ bool DominanceLogic(
 	std::vector<std::multimap<double, MyLabel*, std::greater<double>>>*& newExtended,
 	std::vector<std::multimap<double, MyLabel*, std::greater<double>>>*& oldExtended,
 	MyLabel* preLab,
-	bool newLabelFalg,
+	bool newLabelFlag,
 	bool heuDom);
 
 void JgeDominance(

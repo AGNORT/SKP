@@ -26,5 +26,5 @@ time split of the solve time of our method components on the five classes
 
 ## 3. Detailed computational results
 
-The detailed computational results are provided in the Excel files “SKP_detailed-results_DATASET.xlsx", where “DATASET” stands for “Monaci”, “Monaci2b”, or “RyuPark”.
+The detailed computational results are provided in the Excel files “SKP-S_detailed-results_DATASET.xlsx", where “DATASET” stands for “Monaci”, “Monaci2b”, or “RyuPark”.
 

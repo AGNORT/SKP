@@ -18,10 +18,10 @@ extern "C" {
 #include "gurobi_c++.h"
 
 
-//call the gurobi solver to solve the compact SOCP model of submodular knapsack problem
+// Call the GuRoBi solver to solve the compact SOCP model of the SKP-S
 void SolveCompactKnapsackModel(Args& args);
 
-//call the gurobi solver to solve the linear relaxation of the knapsack problem
+// Call the GuRoBi solver to solve the linear relaxation of the Knapsack Problem
 void SolveLinearKnapsack(Instance& instance, int itemIdx, double& preWeight, double& dualProfit);
 
 

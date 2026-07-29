@@ -11,16 +11,16 @@ int main(int argc, char** argv) {
 	Args args = { 0 };
 	parse_args(&args, argc, argv);
 
-	/**********Solve SKP*******/
-	cout << "Solve SKP use ";
+	/**********Solve SKP-S*******/
+	cout << "Solve SKP-S using ";
 	if (strcmp(args.method, "DP") == 0) {
 		cout << "DP!" << endl;
-		//call labelsetting algorithm to solve the submodular knapsack problem
+		// Call DP exact method to solve the SKP-S
 		LabelSettingSolveKnapsack(args);
 	}
 	else{
 		cout << "Gurobi!" << endl;
-		//call the gurobi solver to solve the compact SOCP model of submodular knapsack problem
+		// Call the Gurobi solver to solve the compact SOCP model of the SKP-S
 		SolveCompactKnapsackModel(args);
 	}
 

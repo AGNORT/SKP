@@ -29,7 +29,6 @@ typedef struct {
 	double capacity;		// knapsack capacity
 	double rho;				// risk parameter
 	size_t n_items_eff;
-	bool ratio_sigma_a_const;
 	bool equal_p_a;
 } Instance;
 
